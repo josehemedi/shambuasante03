@@ -1,0 +1,44 @@
+import { ROLE_KEYS } from "@/config/roles"
+
+// Rôles qu'un TENANT_ADMIN peut créer côté backend.
+export const TENANT_CREATABLE_ROLE_KEYS = [
+  ROLE_KEYS.DOCTOR,
+  ROLE_KEYS.RECEPTIONIST,
+  ROLE_KEYS.CASHIER,
+  ROLE_KEYS.PATIENT,
+  ROLE_KEYS.LAB_TECH,
+  ROLE_KEYS.ARCHIVIST,
+  ROLE_KEYS.USER,
+]
+
+const API_TO_FRONTEND_ROLE = {
+  ROLE_SUPER_ADMIN: ROLE_KEYS.SUPER_ADMIN,
+  ROLE_TENANT_ADMIN: ROLE_KEYS.HOSPITAL_ADMIN,
+  ROLE_MEDECIN: ROLE_KEYS.DOCTOR,
+  ROLE_RECEPTION: ROLE_KEYS.RECEPTIONIST,
+  ROLE_CAISSIER: ROLE_KEYS.CASHIER,
+  ROLE_PATIENT: ROLE_KEYS.PATIENT,
+  ROLE_LABORANTIN: ROLE_KEYS.LAB_TECH,
+  ROLE_ARCHIVISTE: ROLE_KEYS.ARCHIVIST,
+  ROLE_USER: ROLE_KEYS.USER,
+}
+
+const FRONTEND_TO_API_ROLE = {
+  [ROLE_KEYS.DOCTOR]: "ROLE_MEDECIN",
+  [ROLE_KEYS.RECEPTIONIST]: "ROLE_RECEPTION",
+  [ROLE_KEYS.CASHIER]: "ROLE_CAISSIER",
+  [ROLE_KEYS.PATIENT]: "ROLE_PATIENT",
+  [ROLE_KEYS.LAB_TECH]: "ROLE_LABORANTIN",
+  [ROLE_KEYS.ARCHIVIST]: "ROLE_ARCHIVISTE",
+  [ROLE_KEYS.USER]: "ROLE_USER",
+}
+
+export function apiRoleToFrontendRole(apiRole) {
+  if (!apiRole) return null
+  const normalized = apiRole.startsWith("ROLE_") ? apiRole : `ROLE_${apiRole}`
+  return API_TO_FRONTEND_ROLE[normalized] || apiRole.toLowerCase()
+}
+
+export function frontendRoleToApiRole(frontendRole) {
+  return FRONTEND_TO_API_ROLE[frontendRole] || `ROLE_${frontendRole?.toUpperCase()}`
+}
