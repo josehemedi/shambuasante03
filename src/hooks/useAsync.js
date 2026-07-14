@@ -20,7 +20,14 @@ export function useAsync(fn, deps = []) {
         }
       })
       .catch((err) => {
-        if (active) setError(err)
+        if (active) {
+          // 403 rôle/session : ne pas afficher d'erreur à l'écran
+          if (err?.silent || err?.status === 403) {
+            setError(null)
+          } else {
+            setError(err)
+          }
+        }
       })
       .finally(() => {
         if (active) setLoading(false)

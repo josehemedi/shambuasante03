@@ -28,6 +28,7 @@ import Prescriptions from "@/pages/Prescriptions"
 import DoctorWorkspace from "@/pages/DoctorWorkspace"
 import TestRequests from "@/pages/TestRequests"
 import Records from "@/pages/Records"
+import PatientDossierCloture from "@/pages/PatientDossierCloture"
 import ArchivesDashboard from "@/pages/ArchivesDashboard"
 import ArchiveDetail from "@/pages/ArchiveDetail"
 import Laboratory from "@/pages/Laboratory"
@@ -82,6 +83,7 @@ const ROLE_CHILD_ROUTES = [
   { path: "lab-results", element: <Guard><LabResults /></Guard> },
   { path: "appointments", element: <Guard><Appointments /></Guard> },
   { path: "records", element: <Guard><Records /></Guard> },
+  { path: "records/:patientId/cloture", element: <Guard><PatientDossierCloture /></Guard> },
   { path: "archives", element: <Guard><ArchivesDashboard /></Guard> },
   { path: "archives/:id", element: <Guard><ArchiveDetail /></Guard> },
   { path: "prescriptions", element: <Guard><Prescriptions /></Guard> },

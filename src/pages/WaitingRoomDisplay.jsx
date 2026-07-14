@@ -8,12 +8,13 @@ import {
   createWaitingRoomLiveClient,
   disconnectWaitingRoomLiveClient,
 } from "@/services/waitingRoomLiveClient"
-import { playAndAnnounceWaitingRoomCall } from "@/lib/waitingRoomAudio"
+import { playAndAnnounceWaitingRoomCall, unlockWaitingRoomAudio } from "@/lib/waitingRoomAudio"
 
 export default function WaitingRoomDisplay() {
   const { t, locale } = useI18n()
   const { user } = useAuth()
   const [live, setLive] = useState(false)
+  const [soundReady, setSoundReady] = useState(false)
   const [current, setCurrent] = useState(null)
   const [history, setHistory] = useState([])
   const lastKeyRef = useRef(null)
@@ -30,17 +31,22 @@ export default function WaitingRoomDisplay() {
       onDisconnect: () => setLive(false),
       onEvent: (payload) => {
         if (!payload || payload.type === "REFRESH") return
-        const key = `${payload.idAdmission}-${payload.appeleAt || payload.numeroPassage}`
+        const key = `${payload.idAdmission}-${payload.appeleAt || payload.numeroPassage}-${payload.rappel ? "R" : "C"}`
         if (lastKeyRef.current === key) return
         lastKeyRef.current = key
         setCurrent(payload)
         setHistory((prev) => [payload, ...prev].slice(0, 6))
-        playAndAnnounceWaitingRoomCall(payload, locale)
+        void playAndAnnounceWaitingRoomCall(payload, locale)
       },
     })
 
     return () => disconnectWaitingRoomLiveClient(client)
   }, [user?.idHopital, locale])
+
+  const enableSound = async () => {
+    await unlockWaitingRoomAudio()
+    setSoundReady(true)
+  }
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-[#071428] text-white">
@@ -55,9 +61,21 @@ export default function WaitingRoomDisplay() {
               {t("waitingRoom.displayTitle")}
             </h1>
           </div>
-          <div className="flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1.5 text-xs text-sky-100">
-            <span className={`h-2 w-2 rounded-full ${live ? "animate-pulse bg-emerald-400" : "bg-slate-400"}`} />
-            {live ? t("waitingRoom.liveOn") : t("waitingRoom.liveOff")}
+          <div className="flex flex-col items-end gap-2">
+            <div className="flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1.5 text-xs text-sky-100">
+              <span className={`h-2 w-2 rounded-full ${live ? "animate-pulse bg-emerald-400" : "bg-slate-400"}`} />
+              {live ? t("waitingRoom.liveOn") : t("waitingRoom.liveOff")}
+            </div>
+            {!soundReady && (
+              <button
+                type="button"
+                onClick={enableSound}
+                className="inline-flex items-center gap-2 rounded-full border border-amber-300/40 bg-amber-400/15 px-3 py-1.5 text-xs font-medium text-amber-100 hover:bg-amber-400/25"
+              >
+                <Volume2 className="h-3.5 w-3.5" />
+                {t("waitingRoom.enableSound")}
+              </button>
+            )}
           </div>
         </header>
 

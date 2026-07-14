@@ -112,7 +112,10 @@ async function fetchPdfBlob(path) {
       /* réponse non-JSON (ex. HTML proxy) */
     }
     if (response.status === 403) {
-      throw new Error(detail || "Accès refusé.")
+      const err = new Error("")
+      err.status = 403
+      err.silent = true
+      throw err
     }
     if (response.status === 404) throw new Error(detail || "Document introuvable.")
     throw new Error(detail || "Impossible de générer le PDF.")

@@ -45,6 +45,7 @@ import { useI18n } from "@/i18n/I18nProvider"
 import { useAuth } from "@/auth/AuthProvider"
 import { ROLE_KEYS } from "@/config/roles"
 import { useAsync } from "@/hooks/useAsync"
+import { useRolePath } from "@/hooks/useRolePath"
 import { patientPortalService, consultationService } from "@/services/api"
 import { cn, formatDate, formatDateTime } from "@/lib/utils"
 import { exportRecordsToExcel } from "@/lib/exportRecordsExcel"
@@ -138,7 +139,8 @@ function consultationsToDoctorRecords(consultations, t) {
       const dateValue = c.dateConsultation || c.date || null
       const medecinName = (c.nomMedecin || c.medecin || "").trim() || "—"
       const patientName = (c.nomPatient || "").trim() || "—"
-      const patientId = c.idPatient != null ? `PT-${c.idPatient}` : "—"
+      const idPatient = c.idPatient != null ? Number(c.idPatient) : null
+      const patientId = idPatient != null ? `PT-${idPatient}` : "—"
       const isSigned = (c.statut || "").toUpperCase() === "SIGNEE"
       const detail = {
         id,
@@ -165,6 +167,7 @@ function consultationsToDoctorRecords(consultations, t) {
         kind: "consultation",
         patientName,
         patientId,
+        idPatient,
         recordType: t("records.types.consultation"),
         date: dateValue,
         doctor: medecinName,
@@ -277,7 +280,7 @@ function FilterChip({ active, onClick, children }) {
   )
 }
 
-function RecordCard({ rec, isPatient, onSelect, t, locale, index = 0 }) {
+function RecordCard({ rec, isPatient, onSelect, onCloture, t, locale, index = 0 }) {
   const style = KIND_STYLE[rec.kind] || KIND_STYLE.mock
   const Icon = rec.icon
 
@@ -355,20 +358,25 @@ function RecordCard({ rec, isPatient, onSelect, t, locale, index = 0 }) {
         <div className="relative border-t border-border/60 bg-muted/30 p-3">
           <Button
             size="sm"
-            variant="outline"
+            variant={onCloture ? "default" : "outline"}
             className="w-full justify-between group-hover:border-primary/40 group-hover:bg-primary/5"
-            onClick={() => onSelect(rec)}
+            onClick={() => (onCloture ? onCloture(rec) : onSelect(rec))}
           >
-            {t("records.viewDetails")}
+            {onCloture ? t("records.cloture.openAction") : t("records.viewDetails")}
             <ChevronRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
           </Button>
+          {onCloture && (
+            <Button size="sm" variant="ghost" className="mt-1.5 w-full" onClick={() => onSelect(rec)}>
+              {t("records.viewDetails")}
+            </Button>
+          )}
         </div>
       </Card>
     </motion.div>
   )
 }
 
-function DoctorRecordRow({ rec, onSelect, t, locale, index }) {
+function DoctorRecordRow({ rec, onSelect, onCloture, t, locale, index }) {
   const parsed = parseRecordDate(rec.date)
   const day = parsed ? formatDate(parsed, locale, { day: "2-digit" }) : "—"
   const month = parsed ? formatDate(parsed, locale, { month: "short" }) : ""
@@ -401,6 +409,11 @@ function DoctorRecordRow({ rec, onSelect, t, locale, index }) {
         </div>
 
         <div className="flex min-w-0 flex-1 items-start gap-4">
+          <button
+            type="button"
+            className="flex min-w-0 flex-1 items-start gap-4 text-left"
+            onClick={() => (onCloture ? onCloture(rec) : onSelect(rec))}
+          >
           <Avatar name={rec.patientName} className="h-12 w-12 shrink-0 ring-2 ring-primary/10" />
           <div className="min-w-0 flex-1 space-y-2">
             <div className="flex flex-wrap items-center gap-2">
@@ -434,17 +447,23 @@ function DoctorRecordRow({ rec, onSelect, t, locale, index }) {
             </div>
             <p className="font-mono text-[10px] text-muted-foreground">{rec.id}</p>
           </div>
+          </button>
         </div>
 
         <div className="flex shrink-0 items-center gap-2 lg:flex-col lg:items-stretch">
           <Button
             size="sm"
             className="w-full gap-1.5 shadow-sm"
-            onClick={() => onSelect(rec)}
+            onClick={() => (onCloture ? onCloture(rec) : onSelect(rec))}
           >
-            {t("records.viewDetails")}
+            {onCloture ? t("records.cloture.openAction") : t("records.viewDetails")}
             <ChevronRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
           </Button>
+          {onCloture && (
+            <Button size="sm" variant="outline" className="w-full" onClick={() => onSelect(rec)}>
+              {t("records.viewDetails")}
+            </Button>
+          )}
         </div>
       </div>
     </motion.div>
@@ -473,6 +492,7 @@ function RecordsSkeleton({ count = 4, list = false }) {
 export default function Records() {
   const { t, locale, lang } = useI18n()
   const { roleKey, user } = useAuth()
+  const { go } = useRolePath()
   const { scopedSubtitle, hasTenant, hospitalName } = useTenantScope()
   const isPatient = roleKey === ROLE_KEYS.PATIENT
   const isDoctor = roleKey === ROLE_KEYS.DOCTOR
@@ -500,6 +520,20 @@ export default function Records() {
   const [pdfLoading, setPdfLoading] = useState(false)
   const [pdfError, setPdfError] = useState(null)
   const [exporting, setExporting] = useState(false)
+
+  const openCloture = (rec) => {
+    const id = rec?.idPatient
+    if (id == null) {
+      MySwal.fire({
+        icon: "warning",
+        title: t("records.cloture.invalidPatient"),
+        timer: 2200,
+        showConfirmButton: false,
+      })
+      return
+    }
+    go(`/records/${id}/cloture`)
+  }
 
   const handleOpenDossierPdf = async () => {
     if (!isPatient || pdfLoading) return
@@ -939,6 +973,7 @@ export default function Records() {
               key={rec.id}
               rec={rec}
               onSelect={setSelectedRecord}
+              onCloture={isDoctor ? openCloture : undefined}
               t={t}
               locale={locale}
               index={index}
@@ -953,6 +988,7 @@ export default function Records() {
               rec={rec}
               isPatient={isPatient}
               onSelect={setSelectedRecord}
+              onCloture={isDoctor ? openCloture : undefined}
               t={t}
               locale={locale}
               index={index}

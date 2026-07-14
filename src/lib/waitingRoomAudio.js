@@ -1,8 +1,36 @@
 /** Audio + annonce vocale pour l'appel patient (salle d'attente). */
 
-export function playWaitingRoomChime() {
+let sharedCtx = null
+
+function getAudioContext() {
+  if (typeof window === "undefined") return null
+  const Ctx = window.AudioContext || window.webkitAudioContext
+  if (!Ctx) return null
+  if (!sharedCtx || sharedCtx.state === "closed") {
+    sharedCtx = new Ctx()
+  }
+  return sharedCtx
+}
+
+/** Débloque le son navigateur (autoplay) après un geste utilisateur. */
+export async function unlockWaitingRoomAudio() {
   try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)()
+    const ctx = getAudioContext()
+    if (ctx?.state === "suspended") await ctx.resume()
+    if (typeof window !== "undefined" && window.speechSynthesis) {
+      window.speechSynthesis.getVoices()
+    }
+  } catch {
+    // ignore
+  }
+}
+
+export async function playWaitingRoomChime() {
+  try {
+    const ctx = getAudioContext()
+    if (!ctx) return
+    if (ctx.state === "suspended") await ctx.resume()
+
     const now = ctx.currentTime
     ;[523.25, 659.25, 783.99].forEach((freq, i) => {
       const osc = ctx.createOscillator()
@@ -39,10 +67,24 @@ export function announceWaitingRoomCall(payload, locale = "fr") {
   utter.lang = locale === "fr" ? "fr-FR" : "en-US"
   utter.rate = 0.95
   window.speechSynthesis.cancel()
-  window.speechSynthesis.speak(utter)
+
+  const voices = window.speechSynthesis.getVoices()
+  const preferred = voices.find((v) => v.lang?.startsWith(utter.lang.slice(0, 2)))
+  if (preferred) utter.voice = preferred
+
+  // Certains navigateurs ne parlent qu’après un tick / chargement des voix
+  const speak = () => window.speechSynthesis.speak(utter)
+  if (voices.length === 0) {
+    window.speechSynthesis.addEventListener("voiceschanged", speak, { once: true })
+    setTimeout(speak, 150)
+  } else {
+    speak()
+  }
 }
 
-export function playAndAnnounceWaitingRoomCall(payload, locale = "fr") {
-  playWaitingRoomChime()
-  announceWaitingRoomCall(payload, locale)
+export async function playAndAnnounceWaitingRoomCall(payload, locale = "fr") {
+  await unlockWaitingRoomAudio()
+  await playWaitingRoomChime()
+  // Léger délai pour laisser le ding-dong avant la voix
+  setTimeout(() => announceWaitingRoomCall(payload, locale), 380)
 }

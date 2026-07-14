@@ -56,20 +56,35 @@ async function parseResponse(response) {
   }
 
   if (!response.ok) {
-    const message =
+    const rawMessage =
       (payload && typeof payload === "object" && (payload.message || payload.error)) ||
       (typeof payload === "string" && payload ? payload : null)
+    const code = payload && typeof payload === "object" ? (payload.code || payload.error) : undefined
+
+    // Ne plus afficher les 403 « rôle / session » à l'utilisateur
+    const isAccessDenied403 =
+      response.status === 403 &&
+      (code === "ACCESS_DENIED" ||
+        !rawMessage ||
+        /accès refusé/i.test(String(rawMessage)) ||
+        /rôle ou votre session/i.test(String(rawMessage)) ||
+        /vérifiez votre rôle/i.test(String(rawMessage)) ||
+        /^forbidden$/i.test(String(rawMessage)))
+
     const error = new Error(
-      message ||
-        (response.status === 401
-          ? "Session expirée. Veuillez vous reconnecter."
-          : response.status === 403
-            ? "Accès refusé. Vérifiez votre rôle ou reconnectez-vous."
-            : `HTTP ${response.status}`),
+      isAccessDenied403
+        ? ""
+        : rawMessage ||
+          (response.status === 401
+            ? "Session expirée. Veuillez vous reconnecter."
+            : response.status === 403
+              ? ""
+              : `HTTP ${response.status}`),
     )
     error.status = response.status
     error.payload = payload
-    error.code = payload && typeof payload === "object" ? (payload.code || payload.error) : undefined
+    error.code = code
+    error.silent = Boolean(isAccessDenied403 || (response.status === 403 && !rawMessage))
     throw error
   }
 

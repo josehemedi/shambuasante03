@@ -16,6 +16,7 @@ import {
   disconnectMedecinQueueLiveClient,
 } from "@/services/medecinQueueLiveClient"
 import { cn } from "@/lib/utils"
+import { playAndAnnounceWaitingRoomCall } from "@/lib/waitingRoomAudio"
 
 const MySwal = withReactContent(Swal)
 
@@ -32,7 +33,7 @@ const STATUS_VARIANT = {
 }
 
 export default function WaitingRoom() {
-  const { t } = useI18n()
+  const { t, locale } = useI18n()
   const { user } = useAuth()
   const navigate = useNavigate()
   const { data: queue, setData: setQueue, loading, error, reload } = useAsyncList(
@@ -104,6 +105,16 @@ export default function WaitingRoom() {
           }),
         )
         const isRecall = Boolean(event?.rappel) || item.statut === "APPELE"
+        await playAndAnnounceWaitingRoomCall(
+          {
+            ...(event || {}),
+            numeroPassage: numero,
+            salle,
+            patientNom: event?.patientNom || item.patient || item.patientNom || "",
+            rappel: isRecall,
+          },
+          locale,
+        )
         await MySwal.fire({
           icon: "success",
           title: isRecall ? t("waitingRoom.recallSuccessTitle") : t("waitingRoom.callSuccessTitle"),
@@ -125,7 +136,7 @@ export default function WaitingRoom() {
         setActingId(null)
       }
     },
-    [reload, setQueue, t],
+    [locale, reload, setQueue, t],
   )
 
   const handleStart = useCallback(

@@ -34,7 +34,7 @@ export function ReceptionCallAlerts() {
         const key = `${payload.idAdmission}-${payload.appeleAt || Date.now()}-${payload.rappel ? "R" : "C"}`
         if (lastKeyRef.current === key) return
         lastKeyRef.current = key
-        playAndAnnounceWaitingRoomCall(payload, locale)
+        void playAndAnnounceWaitingRoomCall(payload, locale)
       },
     })
 
