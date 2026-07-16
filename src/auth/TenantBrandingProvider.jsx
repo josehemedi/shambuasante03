@@ -6,7 +6,6 @@ import { tenantService } from "@/services/api"
 const TenantBrandingContext = createContext(null)
 
 const EMPTY = {
-  subdomain: null,
   tenant: null,
   loading: false,
   error: null,
@@ -16,7 +15,8 @@ const EMPTY = {
 }
 
 /**
- * Branding établissement = compte connecté (idHopital JWT), jamais le sous-domaine URL.
+ * Branding établissement = uniquement le compte connecté (idHopital JWT).
+ * Aucune détection par sous-domaine / hostname.
  */
 export function TenantBrandingProvider({ children }) {
   const { user, isAuthenticated, bootstrapping } = useAuth()
@@ -40,7 +40,6 @@ export function TenantBrandingProvider({ children }) {
     let cancelled = false
     setLoading(true)
 
-    // Affichage immédiat depuis le profil auth, puis enrichissement API
     setTenant((prev) =>
       prev?.idHopital === hopitalId
         ? prev
@@ -61,7 +60,6 @@ export function TenantBrandingProvider({ children }) {
       })
       .catch((err) => {
         if (cancelled) return
-        // Garde le label auth si l'API échoue (ex. SUPER_ADMIN sans hôpital ciblé)
         setError(err)
       })
       .finally(() => {
@@ -77,16 +75,11 @@ export function TenantBrandingProvider({ children }) {
   const location = getTenantLocation(tenant)
 
   useEffect(() => {
-    if (displayName) {
-      document.title = `${displayName} | Shambua Santé`
-    } else {
-      document.title = "Shambua Santé"
-    }
+    document.title = displayName ? `${displayName} | Shambua Santé` : "Shambua Santé"
   }, [displayName])
 
   const value = useMemo(
     () => ({
-      subdomain: null,
       tenant,
       loading: bootstrapping || loading,
       error,

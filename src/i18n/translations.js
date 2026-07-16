@@ -186,8 +186,6 @@ export const translations = {
     },
     tenantBranding: {
       loading: "Loading hospital information…",
-      notFoundTitle: "Hospital not found",
-      notFoundBody: "No hospital is linked to this account.",
       accountTenant: "Linked to your account",
       loginSubtitle: "Sign in to {hospital}",
       portalLabel: "Patient & staff portal",
@@ -2759,8 +2757,6 @@ export const translations = {
     },
     tenantBranding: {
       loading: "Chargement des informations de l'établissement…",
-      notFoundTitle: "Établissement introuvable",
-      notFoundBody: "Aucun hôpital n'est associé à ce compte.",
       accountTenant: "Lié à votre compte",
       loginSubtitle: "Connectez-vous à {hospital}",
       portalLabel: "Portail patients & personnel",

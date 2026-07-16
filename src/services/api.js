@@ -2327,17 +2327,10 @@ function mapTenantPublic(d) {
 }
 
 export const tenantService = {
-  /** Établissement du compte connecté (JWT idHopital) — source de vérité SaaS. */
+  /** Établissement du compte connecté (JWT idHopital) — seule source de vérité SaaS. */
   getCurrent: () =>
     liveApiOnly(async () => {
       const data = await http.get("/tenant/current")
       return mapTenantPublic(data)
     }),
-}
-
-/** @deprecated Préférer tenantService.getCurrent() (tenant = compte, pas sous-domaine). */
-export const tenantPublicService = {
-  getBySubdomain: () =>
-    Promise.reject(new Error("La détection tenant par sous-domaine est désactivée. Connectez-vous avec votre compte.")),
-  getCurrent: () => tenantService.getCurrent(),
 }
