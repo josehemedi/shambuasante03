@@ -1,6 +1,15 @@
-import { http, getToken, getHopitalId, API_BASE_URL } from "./httpClient"
+import { http, getToken, getHopitalId, shouldSendHopitalHeader, API_BASE_URL } from "./httpClient"
 
 const liveApiOnly = (fn) => fn()
+
+function applyTenantHeaders(headers) {
+  const token = getToken()
+  if (token) headers.set("Authorization", `Bearer ${token}`)
+  if (shouldSendHopitalHeader()) {
+    const hopitalId = getHopitalId()
+    if (hopitalId != null) headers.set("X-Hopital-Id", String(hopitalId))
+  }
+}
 
 export const archiveService = {
   getStats: () => liveApiOnly(() => http.get("/archives/statistiques")),
@@ -37,10 +46,7 @@ export const archiveService = {
 
   uploadFichier: async (archiveId, file, libelle) => {
     const headers = new Headers()
-    const token = getToken()
-    if (token) headers.set("Authorization", `Bearer ${token}`)
-    const hopitalId = getHopitalId()
-    if (hopitalId != null) headers.set("X-Hopital-Id", String(hopitalId))
+    applyTenantHeaders(headers)
     const form = new FormData()
     form.append("file", file)
     if (libelle) form.append("libelle", libelle)
@@ -70,10 +76,7 @@ export const archiveService = {
 
   downloadFichierBlob: async (archiveId, fichierId) => {
     const headers = new Headers()
-    const token = getToken()
-    if (token) headers.set("Authorization", `Bearer ${token}`)
-    const hopitalId = getHopitalId()
-    if (hopitalId != null) headers.set("X-Hopital-Id", String(hopitalId))
+    applyTenantHeaders(headers)
     const response = await fetch(
       `${API_BASE_URL}/archives/${archiveId}/fichiers/${fichierId}/download`,
       { headers },

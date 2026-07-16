@@ -91,7 +91,10 @@ export default function ArchivesDashboard() {
   const canArchive = roleKey === ROLE_KEYS.ARCHIVIST || roleKey === ROLE_KEYS.HOSPITAL_ADMIN
   const isReception = roleKey === ROLE_KEYS.RECEPTIONIST
 
-  const { data: stats, loading: statsLoading, error: statsError } = useAsync(() => archiveService.getStats(), [])
+  const { data: stats, loading: statsLoading, error: statsError, reload: reloadStats } = useAsync(
+    () => archiveService.getStats(),
+    [],
+  )
 
   const listFetcher = useMemo(() => {
     const size = 20
@@ -112,12 +115,13 @@ export default function ArchivesDashboard() {
   useEffect(() => {
     if (roleKey !== ROLE_KEYS.ARCHIVIST) return
     if (pendingDischargeAlerts.length > lastAlertCountRef.current) {
+      reloadStats?.()
       if (activeTab === "aVerifier" || activeTab === "dashboard") {
         reload?.()
       }
     }
     lastAlertCountRef.current = pendingDischargeAlerts.length
-  }, [pendingDischargeAlerts.length, roleKey, activeTab, reload])
+  }, [pendingDischargeAlerts.length, roleKey, activeTab, reload, reloadStats])
 
   const items = listData?.items || listData || []
   const total = listData?.total ?? items.length
@@ -368,7 +372,15 @@ export default function ArchivesDashboard() {
                         className="h-9 bg-background pl-8"
                       />
                     </div>
-                    <Button variant="outline" size="sm" className="h-9" onClick={() => reload()}>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-9"
+                      onClick={() => {
+                        reload()
+                        reloadStats()
+                      }}
+                    >
                       <Search className="h-4 w-4" />
                     </Button>
                   </div>

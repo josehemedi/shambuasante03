@@ -1,6 +1,6 @@
 // Service layer — connecté au backend Hospicloud avec repli mock si indisponible.
 
-import { http, USE_LIVE_API, getToken, getHopitalId, API_BASE_URL } from "./httpClient"
+import { http, USE_LIVE_API, getToken, getHopitalId, shouldSendHopitalHeader, API_BASE_URL } from "./httpClient"
 import { ROLE_KEYS } from "@/config/roles"
 import {
   kpis,
@@ -98,10 +98,12 @@ async function liveApiOnly(liveCall) {
 
 async function fetchPdfBlob(path) {
   const token = getToken()
-  const hopitalId = getHopitalId()
   const headers = { Accept: "application/pdf" }
   if (token) headers.Authorization = `Bearer ${token}`
-  if (hopitalId != null) headers["X-Hopital-Id"] = String(hopitalId)
+  if (shouldSendHopitalHeader()) {
+    const hopitalId = getHopitalId()
+    if (hopitalId != null) headers["X-Hopital-Id"] = String(hopitalId)
+  }
   const response = await fetch(`${API_BASE_URL}${path}`, { headers })
   if (!response.ok) {
     let detail = null
@@ -902,10 +904,12 @@ export const dischargeService = {
   downloadBulletin: (idBonSortie) =>
     liveApiOnly(async () => {
       const token = getToken()
-      const hopitalId = getHopitalId()
       const headers = {}
       if (token) headers.Authorization = `Bearer ${token}`
-      if (hopitalId != null) headers["X-Hopital-Id"] = String(hopitalId)
+      if (shouldSendHopitalHeader()) {
+        const hopitalId = getHopitalId()
+        if (hopitalId != null) headers["X-Hopital-Id"] = String(hopitalId)
+      }
       const response = await fetch(`${API_BASE_URL}/v1/discharge-notes/${idBonSortie}/bulletin`, { headers })
       if (!response.ok) throw new Error("Impossible de générer le bulletin de sortie.")
       return response.blob()
@@ -2322,10 +2326,18 @@ function mapTenantPublic(d) {
   }
 }
 
-export const tenantPublicService = {
-  getBySubdomain: (subdomain) =>
+export const tenantService = {
+  /** Établissement du compte connecté (JWT idHopital) — source de vérité SaaS. */
+  getCurrent: () =>
     liveApiOnly(async () => {
-      const data = await http.get(`/public/tenant?subdomain=${encodeURIComponent(subdomain)}`)
+      const data = await http.get("/tenant/current")
       return mapTenantPublic(data)
     }),
+}
+
+/** @deprecated Préférer tenantService.getCurrent() (tenant = compte, pas sous-domaine). */
+export const tenantPublicService = {
+  getBySubdomain: () =>
+    Promise.reject(new Error("La détection tenant par sous-domaine est désactivée. Connectez-vous avec votre compte.")),
+  getCurrent: () => tenantService.getCurrent(),
 }

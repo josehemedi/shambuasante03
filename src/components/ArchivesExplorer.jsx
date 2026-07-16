@@ -93,8 +93,8 @@ export function ArchivesExplorer({ canManage = false }) {
   const [expanded, setExpanded] = useState(() => new Set())
 
   const load = useCallback(
-    async (id = folderId) => {
-      setLoading(true)
+    async (id = folderId, { soft = false } = {}) => {
+      if (!soft) setLoading(true)
       setError(null)
       try {
         const [explorer, arbre] = await Promise.all([
@@ -116,7 +116,7 @@ export function ArchivesExplorer({ canManage = false }) {
           setError(err?.message || t("archives.loadError"))
         }
       } finally {
-        setLoading(false)
+        if (!soft) setLoading(false)
       }
     },
     [folderId, t],
@@ -124,6 +124,23 @@ export function ArchivesExplorer({ canManage = false }) {
 
   useEffect(() => {
     load(folderId)
+  }, [folderId, load])
+
+  // Rechargement auto (sans F5) tant que l’explorateur est ouvert
+  useEffect(() => {
+    const tick = () => {
+      if (document.visibilityState === "hidden") return
+      load(folderId, { soft: true })
+    }
+    const timer = window.setInterval(tick, 15_000)
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") load(folderId, { soft: true })
+    }
+    document.addEventListener("visibilitychange", onVisibility)
+    return () => {
+      window.clearInterval(timer)
+      document.removeEventListener("visibilitychange", onVisibility)
+    }
   }, [folderId, load])
 
   const openFolder = (id) => {

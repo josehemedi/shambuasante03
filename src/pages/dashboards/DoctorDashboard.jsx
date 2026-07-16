@@ -103,11 +103,6 @@ export default function DoctorDashboard() {
   const { data, setData, loading, error, reload } = useAsync(() => doctorService.getDashboard(), [])
 
   useEffect(() => {
-    const timer = setInterval(reload, 20_000)
-    return () => clearInterval(timer)
-  }, [reload])
-
-  useEffect(() => {
     const tenantId = user?.idHopital
     const token = getToken()
     if (!tenantId || !token) return undefined

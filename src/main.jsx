@@ -12,13 +12,13 @@ createRoot(document.getElementById("root")).render(
   <StrictMode>
     <ThemeProvider>
       <I18nProvider>
-        <TenantBrandingProvider>
-          <AuthProvider>
+        <AuthProvider>
+          <TenantBrandingProvider>
             <BrowserRouter>
               <App />
             </BrowserRouter>
-          </AuthProvider>
-        </TenantBrandingProvider>
+          </TenantBrandingProvider>
+        </AuthProvider>
       </I18nProvider>
     </ThemeProvider>
   </StrictMode>,

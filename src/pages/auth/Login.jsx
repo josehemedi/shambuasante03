@@ -3,20 +3,17 @@ import { useNavigate, useLocation, Link } from "react-router-dom"
 import { motion } from "framer-motion"
 import { Mail, Lock, LogIn, Loader2, ChevronRight } from "lucide-react"
 import { useAuth, DEMO_PASSWORD } from "@/auth/AuthProvider"
-import { useTenantBranding } from "@/auth/TenantBrandingProvider"
 import { useI18n } from "@/i18n/I18nProvider"
 import { roleList, ROLE_KEYS } from "@/config/roles"
 import { canRoleAccess } from "@/config/navigation"
 import { roleHomePath, withRolePath, stripRolePrefix } from "@/config/roleRoutes"
 import { AuthShell } from "@/components/auth/AuthShell"
-import { TenantContextCard } from "@/components/tenant/TenantBrandingUI"
 import { Field, PasswordField } from "@/components/auth/Field"
 import { Button } from "@/components/ui/primitives"
 
 export default function Login() {
   const { login } = useAuth()
   const { t } = useI18n()
-  const { hasTenant, displayName } = useTenantBranding()
   const navigate = useNavigate()
   const location = useLocation()
   const from = location.state?.from?.pathname || "/"
@@ -79,15 +76,11 @@ export default function Login() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4 }}
       >
-        <TenantContextCard className="mb-6" />
-
         <h2 className="font-display text-2xl font-bold tracking-tight text-foreground">
           {t("auth.loginTitle")}
         </h2>
         <p className="mt-1.5 text-sm text-muted-foreground">
-          {hasTenant && displayName
-            ? t("tenantBranding.loginSubtitle", { hospital: displayName })
-            : t("auth.loginSubtitle")}
+          {t("auth.loginSubtitle")}
         </p>
 
         <form onSubmit={handleSubmit} className="mt-7 space-y-4" noValidate>

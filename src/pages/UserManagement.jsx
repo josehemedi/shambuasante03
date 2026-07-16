@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from "react"
+import { useMemo, useState } from "react"
 import { motion } from "framer-motion"
 import { UserPlus, Search, Ban, CheckCircle2 } from "lucide-react"
 import { PageHeader } from "@/components/PageHeader"
@@ -34,12 +34,6 @@ export default function UserManagement() {
     () => (isTenantAdmin ? tenantUserService.getAll(adminHospitalName) : userService.getAll()),
     [isTenantAdmin, adminHospitalName],
   )
-
-  useEffect(() => {
-    if (!isTenantAdmin) return undefined
-    const intervalId = window.setInterval(() => reload(), 30000)
-    return () => window.clearInterval(intervalId)
-  }, [isTenantAdmin, reload])
 
   const [query, setQuery] = useState("")
   const [roleFilter, setRoleFilter] = useState("all")

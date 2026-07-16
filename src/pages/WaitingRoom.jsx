@@ -43,11 +43,6 @@ export default function WaitingRoom() {
   const [actingId, setActingId] = useState(null)
 
   useEffect(() => {
-    const timer = setInterval(reload, 12_000)
-    return () => clearInterval(timer)
-  }, [reload])
-
-  useEffect(() => {
     const tenantId = user?.idHopital
     const token = getToken()
     if (!tenantId || !token) return undefined

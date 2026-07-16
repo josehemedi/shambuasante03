@@ -135,6 +135,28 @@ export default function TestRequests() {
     loadRequests()
   }, [loadRequests])
 
+  useEffect(() => {
+    const softLoad = async () => {
+      if (document.visibilityState === "hidden") return
+      try {
+        const list = isLabTech ? await labTechService.listAnalyses() : await medecinLabService.list()
+        setRequests(list || [])
+        setLoadError("")
+      } catch {
+        // silent soft refresh
+      }
+    }
+    const timer = window.setInterval(softLoad, 15_000)
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") softLoad()
+    }
+    document.addEventListener("visibilitychange", onVisibility)
+    return () => {
+      window.clearInterval(timer)
+      document.removeEventListener("visibilitychange", onVisibility)
+    }
+  }, [isLabTech])
+
   const counts = useMemo(() => {
     const list = requests || []
     return {

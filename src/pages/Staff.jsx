@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react"
+import { useMemo, useState } from "react"
 import { Search, Plus, MoreHorizontal, Mail, Phone, UserCheck, UserX, Loader2 } from "lucide-react"
 import { PageHeader } from "@/components/PageHeader"
 import {
@@ -41,11 +41,6 @@ export default function Staff() {
     () => tenantUserService.getAll(hospitalName),
     [hospitalName],
   )
-
-  useEffect(() => {
-    const intervalId = window.setInterval(() => reload(), 30000)
-    return () => window.clearInterval(intervalId)
-  }, [reload])
 
   const [searchTerm, setSearchTerm] = useState("")
   const [roleFilter, setRoleFilter] = useState("all")

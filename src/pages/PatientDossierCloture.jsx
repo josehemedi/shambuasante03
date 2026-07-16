@@ -66,6 +66,7 @@ export default function PatientDossierCloture() {
   const { data: patient, loading: patientLoading, error: patientError } = useAsync(
     () => (numericId ? patientService.getDossier(numericId) : Promise.resolve(null)),
     [numericId],
+    { pollInterval: false, refetchOnFocus: false },
   )
 
   const [contexte, setContexte] = useState(null)

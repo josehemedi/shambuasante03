@@ -1,24 +1,7 @@
 /**
- * Extrait le sous-domaine tenant depuis le hostname du navigateur.
- * Ex. bandalsante.localhost → "bandalsante"
+ * Helpers d'affichage établissement (branding).
+ * Le tenant SaaS est résolu via le compte connecté (idHopital JWT), pas l'URL.
  */
-export function resolveSubdomainFromHost(hostname) {
-  if (typeof window === "undefined") return null
-  const host = (hostname || window.location.hostname || "").toLowerCase().trim()
-  if (!host || host === "localhost" || host === "127.0.0.1") return null
-
-  if (host.endsWith(".localhost")) {
-    const sub = host.slice(0, -".localhost".length)
-    return sub && sub !== "localhost" ? sub : null
-  }
-
-  const parts = host.split(".")
-  if (parts.length >= 3) {
-    return parts[0] || null
-  }
-
-  return null
-}
 
 export function getTenantDisplayName(tenant) {
   if (!tenant) return null

@@ -1,5 +1,8 @@
 const TOKEN_KEY = "shambua.token"
 const HOPITAL_KEY = "shambua.hopitalId"
+const ROLE_KEY = "shambua.role"
+/** Doit rester aligné avec ROLE_KEYS.SUPER_ADMIN (roles.js). */
+const SUPER_ADMIN_ROLE = "superadmin"
 
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api"
 export const WS_BASE_URL = import.meta.env.VITE_WS_URL || ""
@@ -37,6 +40,27 @@ export function setHopitalId(id) {
 export function clearAuthStorage() {
   setToken(null)
   setHopitalId(null)
+}
+
+/**
+ * SaaS multi-tenant : seul SUPER_ADMIN envoie X-Hopital-Id (impersonation plateforme).
+ * Pour le staff établissement, le tenant est exclusivement issu du JWT côté backend.
+ */
+export function shouldSendHopitalHeader() {
+  if (typeof window === "undefined") return false
+  return window.localStorage.getItem(ROLE_KEY) === SUPER_ADMIN_ROLE
+}
+
+/** En-têtes d’auth multi-tenant pour fetch hors httpClient (PDF, multipart…). */
+export function authHeaders(extra = {}) {
+  const headers = { ...extra }
+  const token = getToken()
+  if (token) headers.Authorization = `Bearer ${token}`
+  if (shouldSendHopitalHeader()) {
+    const hopitalId = getHopitalId()
+    if (hopitalId != null) headers["X-Hopital-Id"] = String(hopitalId)
+  }
+  return headers
 }
 
 async function parseResponse(response) {
@@ -99,11 +123,11 @@ export async function httpClient(path, options = {}) {
     headers.set("Authorization", `Bearer ${token}`)
   }
 
-  const hopitalId = getHopitalId()
-  // X-Hopital-Id : utilisé uniquement par SUPER_ADMIN (TenantResolverFilter).
-  // Pour les rôles établissement, le tenant est toujours issu du JWT, jamais de ce header.
-  if (hopitalId != null) {
-    headers.set("X-Hopital-Id", String(hopitalId))
+  if (shouldSendHopitalHeader()) {
+    const hopitalId = getHopitalId()
+    if (hopitalId != null) {
+      headers.set("X-Hopital-Id", String(hopitalId))
+    }
   }
 
   if (options.body && !headers.has("Content-Type")) {

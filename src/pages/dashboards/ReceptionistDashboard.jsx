@@ -151,8 +151,6 @@ function buildQueueChart(queue, t) {
   }))
 }
 
-const REFRESH_INTERVAL_MS = 20_000
-
 export default function ReceptionistDashboard() {
   const { t } = useI18n()
   const { user } = useAuth()
@@ -206,13 +204,7 @@ export default function ReceptionistDashboard() {
     setLastRefresh(new Date())
   }, [reloadKpis, reloadQueue, reloadRegistrations, reloadSchedule, reloadPretes])
 
-  // Rechargement périodique (filet de sécurité)
-  useEffect(() => {
-    const timer = setInterval(reloadAll, REFRESH_INTERVAL_MS)
-    return () => clearInterval(timer)
-  }, [reloadAll])
-
-  // Rechargement immédiat via WebSocket
+  // Rechargement immédiat via WebSocket (le poll HTTP est géré par useAsync)
   useEffect(() => {
     const tenantId = user?.idHopital
     const token = getToken()

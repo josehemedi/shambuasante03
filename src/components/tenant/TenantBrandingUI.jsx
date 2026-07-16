@@ -1,7 +1,6 @@
 import { useState } from "react"
 import {
   Building2,
-  Globe2,
   Mail,
   MapPin,
   Phone,
@@ -50,11 +49,12 @@ function DetailRow({ icon: Icon, children, className }) {
 
 export function TenantContextCard({ className, compact = false }) {
   const { t } = useI18n()
-  const { tenant, loading, error, subdomain, displayName, location } = useTenantBranding()
+  const { tenant, loading, hasTenant, displayName, location } = useTenantBranding()
 
-  if (!subdomain) return null
+  // Pas de tenant avant connexion — le tenant vient du compte, pas de l'URL
+  if (!hasTenant && !loading) return null
 
-  if (loading) {
+  if (loading && !tenant) {
     return (
       <div
         className={cn(
@@ -68,21 +68,7 @@ export function TenantContextCard({ className, compact = false }) {
     )
   }
 
-  if (error || !tenant) {
-    return (
-      <div
-        className={cn(
-          "rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive",
-          className,
-        )}
-      >
-        <p className="font-semibold">{t("tenantBranding.notFoundTitle")}</p>
-        <p className="mt-1 text-destructive/90">
-          {t("tenantBranding.notFoundBody", { subdomain })}
-        </p>
-      </div>
-    )
-  }
+  if (!tenant) return null
 
   const typeKey = getHospitalTypeLabelKey(tenant.type)
   const typeLabel = typeKey ? t(typeKey) : tenant.type
@@ -129,9 +115,6 @@ export function TenantContextCard({ className, compact = false }) {
       {!compact && (
         <div className="space-y-2 px-4 py-3 text-muted-foreground">
           <DetailRow icon={MapPin}>{location || tenant.adresseComplete}</DetailRow>
-          <DetailRow icon={Globe2}>
-            {tenant.sousDomaine}.localhost
-          </DetailRow>
           <DetailRow icon={Mail}>{tenant.email}</DetailRow>
           <DetailRow icon={Phone}>{tenant.telephone}</DetailRow>
         </div>
@@ -233,7 +216,7 @@ export function TenantSidebarBadge() {
           <p className="truncate text-xs font-semibold text-foreground">{displayName}</p>
           <p className="truncate text-[10px] text-muted-foreground">
             {[typeKey ? t(typeKey) : null, location].filter(Boolean).join(" · ") ||
-              tenant.sousDomaine}
+              t("tenantBranding.accountTenant")}
           </p>
         </div>
       </div>

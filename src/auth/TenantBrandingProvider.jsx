@@ -1,11 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react"
-import { getToken, setHopitalId } from "@/services/httpClient"
-import { tenantPublicService } from "@/services/api"
-import {
-  getTenantDisplayName,
-  getTenantLocation,
-  resolveSubdomainFromHost,
-} from "@/lib/tenantHost"
+import { useAuth } from "@/auth/AuthProvider"
+import { getTenantDisplayName, getTenantLocation } from "@/lib/tenantHost"
+import { tenantService } from "@/services/api"
 
 const TenantBrandingContext = createContext(null)
 
@@ -19,36 +15,53 @@ const EMPTY = {
   location: null,
 }
 
+/**
+ * Branding établissement = compte connecté (idHopital JWT), jamais le sous-domaine URL.
+ */
 export function TenantBrandingProvider({ children }) {
-  const [subdomain] = useState(() => resolveSubdomainFromHost())
+  const { user, isAuthenticated, bootstrapping } = useAuth()
+  const hopitalId = isAuthenticated ? user?.idHopital ?? null : null
+
   const [tenant, setTenant] = useState(null)
-  const [loading, setLoading] = useState(Boolean(subdomain))
+  const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
 
   useEffect(() => {
-    if (!subdomain) {
+    if (bootstrapping) return undefined
+
+    if (!isAuthenticated || hopitalId == null) {
       setTenant(null)
       setLoading(false)
       setError(null)
+      document.title = "Shambua Santé"
       return undefined
     }
 
     let cancelled = false
     setLoading(true)
 
-    tenantPublicService
-      .getBySubdomain(subdomain)
+    // Affichage immédiat depuis le profil auth, puis enrichissement API
+    setTenant((prev) =>
+      prev?.idHopital === hopitalId
+        ? prev
+        : {
+            idHopital: hopitalId,
+            name: user?.tenantLabel || null,
+            nomCommercial: user?.tenantLabel || null,
+            estActif: true,
+          },
+    )
+
+    tenantService
+      .getCurrent()
       .then((data) => {
         if (cancelled) return
         setTenant(data)
         setError(null)
-        if (!getToken() && data?.idHopital != null) {
-          setHopitalId(data.idHopital)
-        }
       })
       .catch((err) => {
         if (cancelled) return
-        setTenant(null)
+        // Garde le label auth si l'API échoue (ex. SUPER_ADMIN sans hôpital ciblé)
         setError(err)
       })
       .finally(() => {
@@ -58,9 +71,9 @@ export function TenantBrandingProvider({ children }) {
     return () => {
       cancelled = true
     }
-  }, [subdomain])
+  }, [bootstrapping, isAuthenticated, hopitalId, user?.tenantLabel])
 
-  const displayName = getTenantDisplayName(tenant)
+  const displayName = getTenantDisplayName(tenant) || user?.tenantLabel || null
   const location = getTenantLocation(tenant)
 
   useEffect(() => {
@@ -73,15 +86,15 @@ export function TenantBrandingProvider({ children }) {
 
   const value = useMemo(
     () => ({
-      subdomain,
+      subdomain: null,
       tenant,
-      loading,
+      loading: bootstrapping || loading,
       error,
-      hasTenant: Boolean(tenant),
+      hasTenant: Boolean(tenant?.idHopital || hopitalId),
       displayName,
       location,
     }),
-    [subdomain, tenant, loading, error, displayName, location],
+    [tenant, loading, bootstrapping, error, displayName, location, hopitalId],
   )
 
   return <TenantBrandingContext.Provider value={value}>{children}</TenantBrandingContext.Provider>
