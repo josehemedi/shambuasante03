@@ -3,7 +3,7 @@ name: Deploy Frontend to Production
 on:
   push:
     branches:
-      - main  # Déclenche le déploiement lors d'un push sur mai
+      - main  # Déclenche le déploiement lors d'un push sur main
   workflow_dispatch:
 
 jobs:
