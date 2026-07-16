@@ -1,0 +1,34 @@
+name: Deploy Frontend to Production
+
+on:
+  push:
+    branches:
+      - main  # Déclenche le déploiement lors d'un push sur main
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy to VPS via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USERNAME }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT || 22 }}
+          script: |
+            echo "--- Début du déploiement du Frontend ---"
+            cd /home/github-deployer/apps/frontend-hopital
+            
+            # 1. Récupérer les dernières modifications du code
+            git pull origin main
+            
+            # 2. Reconstruire et relancer uniquement le conteneur frontend
+            docker compose up -d --build --force-recreate frontend
+            
+            # 3. Nettoyer les anciennes images inutilisées pour libérer de l'espace
+            docker image prune -f
+            
+            echo "--- Déploiement du Frontend terminé avec succès ! ---"
