@@ -6,12 +6,8 @@ import {
   Mic,
   MicOff,
   PhoneOff,
-  MessageSquare,
   Calendar,
   Clock,
-  Send,
-  Check,
-  CheckCheck,
   Users,
   Signal,
   Plus,
@@ -19,7 +15,7 @@ import {
 } from "lucide-react"
 import Swal from "sweetalert2"
 import { PageHeader } from "@/components/PageHeader"
-import { Card, CardHeader, CardContent, CardTitle, Badge, Button, Avatar, Input } from "@/components/ui/primitives"
+import { Card, CardHeader, CardContent, CardTitle, Badge, Button, Avatar } from "@/components/ui/primitives"
 import ScheduleTeleconsultationModal from "@/components/ScheduleTeleconsultationModal"
 import { useI18n } from "@/i18n/I18nProvider"
 import { useAuth } from "@/auth/AuthProvider"
@@ -119,7 +115,8 @@ export default function Teleconsultation() {
     idRdv: activeRdvId,
     tenantId,
     token: getToken(),
-    enabled: Boolean(activeRdvId && tenantId && getToken()),
+    // Chat retiré de l'écran médecin — conservé uniquement pour le parcours patient
+    enabled: Boolean(isPatient && activeRdvId && tenantId && getToken()),
     isDoctor,
   })
 
@@ -636,72 +633,6 @@ export default function Teleconsultation() {
         </div>
 
         <div className="space-y-6">
-          <Card className="flex h-[26rem] flex-col">
-            <CardHeader className="items-center">
-              <div className="flex w-full items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  <MessageSquare className="h-4 w-4 text-primary" />
-                  <CardTitle>{t("tele.chat")}</CardTitle>
-                </div>
-                {chatStatusLabel && (
-                  <Badge variant={chatStatus === "connected" ? "default" : "secondary"}>{chatStatusLabel}</Badge>
-                )}
-              </div>
-              <p className="text-xs text-muted-foreground">{t("tele.chatSecure")}</p>
-            </CardHeader>
-            {chatError && (
-              <p className="px-5 text-xs text-destructive">{chatError}</p>
-            )}
-            <div className="scrollbar-thin flex-1 space-y-3 overflow-y-auto px-5 py-3">
-              {messages.length === 0 && (
-                <p className="text-center text-xs text-muted-foreground">
-                  {activeRdvId ? t("tele.typeMessage") : t("tele.noActive")}
-                </p>
-              )}
-              {messages.map((m) => (
-                <div
-                  key={m.id || `${m.time}-${m.text}`}
-                  className={cn("flex flex-col", m.mine ? "items-end" : "items-start")}
-                >
-                  <div
-                    className={cn(
-                      "max-w-[80%] rounded-2xl px-3.5 py-2 text-sm",
-                      m.mine
-                        ? "rounded-br-sm bg-primary text-primary-foreground"
-                        : "rounded-bl-sm bg-muted text-foreground",
-                    )}
-                  >
-                    {m.text}
-                  </div>
-                  <div className="mt-1 flex items-center gap-1 text-[10px] text-muted-foreground">
-                    <span>{m.time}</span>
-                    {m.mine && (
-                      <span className="inline-flex items-center gap-0.5" title={m.readByRecipient ? t("tele.chatRead") : t("tele.chatSent")}>
-                        {m.readByRecipient ? (
-                          <CheckCheck className="h-3 w-3 text-primary" />
-                        ) : (
-                          <Check className="h-3 w-3" />
-                        )}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-            <form onSubmit={sendMessage} className="flex items-center gap-2 border-t border-border p-3">
-              <Input
-                value={draft}
-                onChange={(e) => setDraft(e.target.value)}
-                placeholder={t("tele.typeMessage")}
-                className="flex-1"
-                disabled={!activeRdvId || sendingChat}
-              />
-              <Button type="submit" size="icon" aria-label={t("tele.send")} disabled={!activeRdvId || sendingChat}>
-                <Send className="h-4 w-4" />
-              </Button>
-            </form>
-          </Card>
-
           <Card>
             <CardHeader className="items-center">
               <div className="flex items-center gap-2">
