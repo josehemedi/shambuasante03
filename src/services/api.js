@@ -1527,10 +1527,22 @@ function mapPatientAppointmentCard(rdv) {
   const validDate = dt && !Number.isNaN(dt.getTime())
   const isTele = (rdv.canal || "").toUpperCase() === "TELECONSULTATION"
   const statut = rdv.statutRdv || rdv.statut || "PROGRAMME"
+  const idRdv = rdv.idRdv ?? rdv.id
+  const idHopital = rdv.idHopital ?? getHopitalId() ?? null
+  const reason = rdv.motifVisite || rdv.motif || "—"
+  const numero = isTele
+    ? rdv.numeroTeleconsultation || formatTeleconsultationNumero(idRdv, idHopital)
+    : idRdv
+      ? `RDV-${String(idRdv).padStart(4, "0")}`
+      : null
+  const label = isTele
+    ? formatTeleconsultationLabel(idRdv, idHopital, reason, "fr")
+    : reason
 
   return {
-    id: rdv.idRdv ?? rdv.id,
-    idRdv: rdv.idRdv ?? rdv.id,
+    id: idRdv,
+    idRdv,
+    idHopital,
     dateHeureRdv: dateTime,
     date: validDate ? dt.toLocaleDateString("fr-FR") : "—",
     dateIso: validDate ? dt.toISOString().split("T")[0] : null,
@@ -1543,8 +1555,10 @@ function mapPatientAppointmentCard(rdv) {
       : "—",
     time: formatDoctorTime(dateTime),
     doctor: rdv.nomMedecin || rdv.medecin || "—",
-    reason: rdv.motifVisite || rdv.motif || "—",
-    specialty: rdv.motifVisite || rdv.motif || "—",
+    reason,
+    specialty: reason,
+    numero,
+    label,
     mode: isTele ? "Teleconsultation" : "In-person",
     isTele,
     canal: rdv.canal || "PHYSIQUE",

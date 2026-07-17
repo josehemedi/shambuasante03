@@ -258,6 +258,40 @@ export default function PatientTeleconsultationView({
               {t("tele.patient.greeting", { name: firstName })} — {t("tele.patient.studioSubtitle")}
             </p>
 
+            {nextSession && (
+              <div className="mt-4 inline-flex max-w-full flex-col gap-1.5 rounded-xl border border-white/15 bg-blue-950/35 px-4 py-3 backdrop-blur-md">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="rounded-md bg-sky-300/20 px-2 py-0.5 font-mono text-[11px] font-bold tracking-wide text-sky-100">
+                    {nextSession.numero ||
+                      formatTeleconsultationNumero(
+                        nextSession.idRdv || nextSession.id,
+                        nextSession.idHopital || tenantId,
+                      )}
+                  </span>
+                  <span className="text-[11px] font-medium text-sky-100/70">
+                    {t("tele.rdvNumber", { id: nextSession.idRdv || nextSession.id })}
+                  </span>
+                </div>
+                <p
+                  className="truncate text-sm font-semibold text-white"
+                  style={{ fontFamily: '"Fraunces", "Sora", serif' }}
+                >
+                  {nextSession.label ||
+                    formatTeleconsultationLabel(
+                      nextSession.idRdv || nextSession.id,
+                      nextSession.idHopital || tenantId,
+                      nextSession.reason,
+                      locale === "en" ? "en" : "fr",
+                    )}
+                </p>
+                <p className="truncate text-xs text-sky-100/70">
+                  {nextSession.doctor}
+                  {nextSession.time ? ` · ${nextSession.time}` : ""}
+                  {nextSession.date && nextSession.date !== "—" ? ` · ${nextSession.date}` : ""}
+                </p>
+              </div>
+            )}
+
             <div className="mt-7 flex flex-wrap items-center gap-3">
               {nextSession ? (
                 <Button

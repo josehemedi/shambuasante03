@@ -19,6 +19,10 @@ import { useI18n } from "@/i18n/I18nProvider"
 import { useAuth } from "@/auth/AuthProvider"
 import { useRolePath } from "@/hooks/useRolePath"
 import { cn, formatDateTime } from "@/lib/utils"
+import {
+  formatTeleconsultationLabel,
+  formatTeleconsultationNumero,
+} from "@/lib/teleconsultation"
 
 const HERO_IMAGE =
   "https://images.unsplash.com/photo-1631217868264-e5b90bb7e133?auto=format&fit=crop&w=1600&q=80"
@@ -70,6 +74,8 @@ export default function PatientAppointmentsView({ appointments, loading, error, 
         !q ||
         (a.doctor || "").toLowerCase().includes(q) ||
         (a.reason || "").toLowerCase().includes(q) ||
+        (a.label || "").toLowerCase().includes(q) ||
+        (a.numero || "").toLowerCase().includes(q) ||
         String(a.idRdv || "").includes(q)
       const matchesFilter =
         filter === "all" ||
@@ -485,6 +491,23 @@ function NextSpotlight({ appointment, t, locale, onJoin }) {
   const isTele = appointment.isTele
   const canJoin = isTele && ["upcoming", "in-progress"].includes(appointment.status)
   const dt = parseApptDate(appointment.dateHeureRdv)
+  const numero =
+    appointment.numero ||
+    (isTele
+      ? formatTeleconsultationNumero(appointment.idRdv, appointment.idHopital)
+      : appointment.idRdv
+        ? `RDV-${String(appointment.idRdv).padStart(4, "0")}`
+        : null)
+  const label =
+    appointment.label ||
+    (isTele
+      ? formatTeleconsultationLabel(
+          appointment.idRdv,
+          appointment.idHopital,
+          appointment.reason,
+          locale === "en" ? "en" : "fr",
+        )
+      : appointment.reason)
 
   return (
     <div className="relative overflow-hidden rounded-2xl border border-blue-900/10 bg-white/75 shadow-sm backdrop-blur-sm">
@@ -511,13 +534,34 @@ function NextSpotlight({ appointment, t, locale, onJoin }) {
             >
               {t("appointments.patientPortal.nextAppointment")}
             </p>
+            {numero && (
+              <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                <span className="rounded-md bg-blue-800/10 px-2 py-0.5 font-mono text-[11px] font-bold tracking-wide text-blue-900">
+                  {numero}
+                </span>
+                {appointment.idRdv && (
+                  <span className="text-[11px] font-medium text-blue-800/50">
+                    {t("tele.rdvNumber", { id: appointment.idRdv })}
+                  </span>
+                )}
+              </div>
+            )}
             <h3
               className="mt-1 text-xl font-semibold text-[#0b1f4a]"
               style={{ fontFamily: '"Fraunces", "Sora", serif' }}
             >
-              {appointment.doctor}
+              {isTele ? label : appointment.doctor}
             </h3>
-            <p className="mt-1 line-clamp-2 text-sm text-blue-800/60">{appointment.reason}</p>
+            <p className="mt-1 line-clamp-2 text-sm text-blue-800/60">
+              {isTele ? (
+                <>
+                  <span className="font-medium text-blue-900/80">{appointment.doctor}</span>
+                  {appointment.reason && appointment.reason !== "—" ? ` · ${appointment.reason}` : ""}
+                </>
+              ) : (
+                appointment.reason
+              )}
+            </p>
             <p className="mt-2 text-sm font-medium text-blue-950/80">
               {formatDateTime(appointment.dateHeureRdv, locale)}
               <span className="mx-2 text-blue-800/35">·</span>
@@ -555,6 +599,23 @@ function AppointmentRow({ appointment, index, t, locale, onJoin }) {
   const month = dt
     ? dt.toLocaleDateString(locale === "fr" ? "fr-FR" : "en-US", { month: "short" })
     : "—"
+  const numero =
+    appointment.numero ||
+    (isTele
+      ? formatTeleconsultationNumero(appointment.idRdv, appointment.idHopital)
+      : appointment.idRdv
+        ? `RDV-${String(appointment.idRdv).padStart(4, "0")}`
+        : null)
+  const label =
+    appointment.label ||
+    (isTele
+      ? formatTeleconsultationLabel(
+          appointment.idRdv,
+          appointment.idHopital,
+          appointment.reason,
+          locale === "en" ? "en" : "fr",
+        )
+      : appointment.reason)
 
   return (
     <motion.article
@@ -617,13 +678,36 @@ function AppointmentRow({ appointment, index, t, locale, onJoin }) {
             <div className="mt-2.5 flex items-start gap-3">
               <Avatar name={appointment.doctor} className="mt-0.5 h-9 w-9 text-xs" />
               <div className="min-w-0">
+                {numero && (
+                  <div className="mb-1 flex flex-wrap items-center gap-2">
+                    <span className="rounded-md bg-blue-800/10 px-2 py-0.5 font-mono text-[10px] font-bold tracking-wide text-blue-900">
+                      {numero}
+                    </span>
+                    {appointment.idRdv && (
+                      <span className="text-[10px] font-medium text-blue-800/45">
+                        {t("tele.rdvNumber", { id: appointment.idRdv })}
+                      </span>
+                    )}
+                  </div>
+                )}
                 <h4
                   className="text-[1.05rem] font-semibold leading-snug text-[#0b1f4a]"
                   style={{ fontFamily: '"Fraunces", "Sora", serif' }}
                 >
-                  {appointment.doctor}
+                  {isTele ? label : appointment.doctor}
                 </h4>
-                <p className="mt-0.5 line-clamp-2 text-sm text-blue-800/55">{appointment.reason}</p>
+                <p className="mt-0.5 line-clamp-2 text-sm text-blue-800/55">
+                  {isTele ? (
+                    <>
+                      <span className="font-medium text-blue-900/75">{appointment.doctor}</span>
+                      {appointment.reason && appointment.reason !== "—"
+                        ? ` · ${appointment.reason}`
+                        : ""}
+                    </>
+                  ) : (
+                    appointment.reason
+                  )}
+                </p>
               </div>
             </div>
 
@@ -637,9 +721,6 @@ function AppointmentRow({ appointment, index, t, locale, onJoin }) {
                 <CalendarDays className="h-3.5 w-3.5" />
                 {formatDateTime(appointment.dateHeureRdv, locale)}
               </span>
-              {appointment.idRdv && (
-                <span className="font-mono opacity-70">#{appointment.idRdv}</span>
-              )}
             </div>
           </div>
 

@@ -25,6 +25,10 @@ import { useRolePath } from "@/hooks/useRolePath"
 import { useAsync } from "@/hooks/useAsync"
 import { patientPortalService } from "@/services/api"
 import { cn, formatDateTime } from "@/lib/utils"
+import {
+  formatTeleconsultationLabel,
+  formatTeleconsultationNumero,
+} from "@/lib/teleconsultation"
 
 const HERO_IMAGE =
   "https://images.unsplash.com/photo-1631217868264-e5b90bb7e133?auto=format&fit=crop&w=1600&q=80"
@@ -67,6 +71,23 @@ function StudioMetric({ icon: Icon, value, label, delay = 0 }) {
 function AppointmentRow({ appointment, t, locale, onJoin, appointmentsPath, index }) {
   const isTele = appointment.isTele || appointment.mode === "Teleconsultation"
   const canJoin = isTele && ["upcoming", "in-progress"].includes(appointment.status)
+  const numero =
+    appointment.numero ||
+    (isTele
+      ? formatTeleconsultationNumero(appointment.idRdv ?? appointment.id, appointment.idHopital)
+      : appointment.idRdv
+        ? `RDV-${String(appointment.idRdv).padStart(4, "0")}`
+        : null)
+  const label =
+    appointment.label ||
+    (isTele
+      ? formatTeleconsultationLabel(
+          appointment.idRdv ?? appointment.id,
+          appointment.idHopital,
+          appointment.reason || appointment.specialty,
+          locale === "en" ? "en" : "fr",
+        )
+      : appointment.reason || appointment.specialty)
 
   return (
     <motion.article
@@ -110,6 +131,16 @@ function AppointmentRow({ appointment, t, locale, onJoin, appointmentsPath, inde
               {t(`statuses.${appointment.status}`)}
             </Badge>
           )}
+          {numero && (
+            <span className="rounded-md bg-blue-800/10 px-2 py-0.5 font-mono text-[10px] font-bold tracking-wide text-blue-900">
+              {numero}
+            </span>
+          )}
+          {(appointment.idRdv || appointment.id) && (
+            <span className="text-[10px] font-medium text-blue-800/45">
+              {t("tele.rdvNumber", { id: appointment.idRdv || appointment.id })}
+            </span>
+          )}
         </div>
         <div className="mt-2 flex items-center gap-2.5">
           <Avatar name={appointment.doctor} className="h-9 w-9 text-xs" />
@@ -118,10 +149,19 @@ function AppointmentRow({ appointment, t, locale, onJoin, appointmentsPath, inde
               className="truncate text-[1.02rem] font-semibold text-[#0b1f4a]"
               style={{ fontFamily: '"Fraunces", "Sora", serif' }}
             >
-              {appointment.doctor}
+              {isTele ? label : appointment.doctor}
             </p>
             <p className="truncate text-xs text-blue-800/55">
-              {appointment.reason || appointment.specialty}
+              {isTele ? (
+                <>
+                  <span className="font-medium text-blue-900/75">{appointment.doctor}</span>
+                  {appointment.reason && appointment.reason !== "—"
+                    ? ` · ${appointment.reason}`
+                    : ""}
+                </>
+              ) : (
+                appointment.reason || appointment.specialty
+              )}
             </p>
           </div>
         </div>
