@@ -23,10 +23,12 @@ jobs:
             cd /home/github-deployer/apps/frontend-hopital
             
             # 1. Récupérer les dernières modifications du code
-            git pull origin main
+            git fetch --all
+            git reset --hard origin/main
             
-            # 2. Reconstruire et relancer uniquement le conteneur frontend
-            docker compose up -d --build --force-recreate frontend
+            # 2. Rebuild sans cache Docker (évite de garder l'ancien JS avec sous-domaine)
+            docker compose build --no-cache frontend
+            docker compose up -d --force-recreate frontend
             
             # 3. Nettoyer les anciennes images inutilisées pour libérer de l'espace
             docker image prune -f
