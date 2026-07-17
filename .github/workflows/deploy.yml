@@ -22,15 +22,29 @@ jobs:
             echo "--- Début du déploiement du Frontend ---"
             cd /home/github-deployer/apps/frontend-hopital
             
-            # 1. Récupérer les dernières modifications du code
+            # 1. Code à jour
             git fetch --all
             git reset --hard origin/main
             
-            # 2. Rebuild sans cache Docker (évite de garder l'ancien JS avec sous-domaine)
+            # 2. Rebuild + relance
             docker compose build --no-cache frontend
             docker compose up -d --force-recreate frontend
             
-            # 3. Nettoyer les anciennes images inutilisées pour libérer de l'espace
+            # 3. Vérifier que le conteneur répond (évite Host Error / 502)
+            sleep 5
+            if ! docker compose ps frontend | grep -q "Up"; then
+              echo "ERREUR: conteneur frontend non démarré"
+              docker compose logs --tail=80 frontend
+              exit 1
+            fi
+            if ! docker compose exec -T frontend wget -qO- http://127.0.0.1/ >/dev/null; then
+              echo "ERREUR: nginx frontend ne répond pas sur :80"
+              docker compose logs --tail=80 frontend
+              exit 1
+            fi
+            echo "OK: frontend healthy"
+            
+            # 4. Nettoyage
             docker image prune -f
             
             echo "--- Déploiement du Frontend terminé avec succès ! ---"
