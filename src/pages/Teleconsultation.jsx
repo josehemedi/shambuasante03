@@ -32,6 +32,7 @@ import TeleconsultationClinicalPanel from "@/components/TeleconsultationClinical
 import PatientTeleconsultationView from "@/components/PatientTeleconsultationView"
 import { MediaSecureContextBanner } from "@/components/MediaSecureContextBanner"
 import { cn, initials } from "@/lib/utils"
+import { formatTeleconsultationLabel, formatTeleconsultationNumero } from "@/lib/teleconsultation"
 
 const ease = [0.22, 1, 0.36, 1]
 
@@ -257,16 +258,20 @@ export default function Teleconsultation() {
   }, [rdvFromUrl, joinSession, liveKitCreds, bootstrapping, callEnded, activeRdvId])
 
   function mapTeleFromRdv(rdv) {
-    const item = {
-      idRdv: rdv.idRdv,
-      idHopital: rdv.idHopital,
+    const idRdv = rdv.idRdv
+    const idHopital = rdv.idHopital ?? null
+    const reason = rdv.motifVisite || "—"
+    return {
+      idRdv,
+      idHopital,
       patient: rdv.nomPatient || "—",
       doctor: rdv.nomMedecin || "—",
-      reason: rdv.motifVisite || "—",
+      reason,
+      numero: formatTeleconsultationNumero(idRdv, idHopital),
+      label: formatTeleconsultationLabel(idRdv, idHopital, reason, locale === "en" ? "en" : "fr"),
       specialty: "—",
       status: "live",
     }
-    return item
   }
 
   async function handleEndCall() {
@@ -638,9 +643,15 @@ export default function Teleconsultation() {
               </div>
 
               {active && (
-                <div className="absolute right-4 top-4 z-20 flex items-center gap-2 rounded-xl bg-blue-950/45 px-3 py-1.5 text-xs font-medium text-white ring-1 ring-white/15 backdrop-blur-md">
-                  <Clock className="h-3.5 w-3.5 text-sky-200" />
-                  RDV #{active.idRdv || activeRdvId}
+                <div className="absolute right-4 top-4 z-20 flex max-w-[min(100%,18rem)] flex-col items-end gap-1.5">
+                  <div className="rounded-xl bg-blue-950/45 px-3 py-1.5 text-xs font-semibold tracking-wide text-white ring-1 ring-white/15 backdrop-blur-md">
+                    {active.numero ||
+                      formatTeleconsultationNumero(active.idRdv || activeRdvId, active.idHopital || tenantId)}
+                  </div>
+                  <div className="flex items-center gap-2 rounded-xl bg-blue-950/45 px-3 py-1.5 text-xs font-medium text-white ring-1 ring-white/15 backdrop-blur-md">
+                    <Clock className="h-3.5 w-3.5 text-sky-200" />
+                    {t("tele.rdvNumber", { id: active.idRdv || activeRdvId })}
+                  </div>
                 </div>
               )}
 
@@ -733,8 +744,20 @@ export default function Teleconsultation() {
                     {initials(remoteLabel)}
                   </div>
                   <div>
+                    <p className="font-mono text-[11px] font-semibold tracking-wide text-blue-700">
+                      {active.numero ||
+                        formatTeleconsultationNumero(active.idRdv || activeRdvId, active.idHopital || tenantId)}
+                    </p>
                     <p className="font-display text-base font-semibold text-slate-900">{remoteLabel}</p>
-                    <p className="text-xs text-slate-500">{active.reason}</p>
+                    <p className="text-xs text-slate-500">
+                      {active.label ||
+                        formatTeleconsultationLabel(
+                          active.idRdv || activeRdvId,
+                          active.idHopital || tenantId,
+                          active.reason,
+                          locale === "en" ? "en" : "fr",
+                        )}
+                    </p>
                   </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
@@ -807,10 +830,27 @@ export default function Teleconsultation() {
                       <span className="font-display text-sm font-bold leading-none">{s.time || "—"}</span>
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="truncate font-display text-sm font-semibold text-slate-900">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="rounded-md bg-blue-600/10 px-2 py-0.5 font-mono text-[10px] font-bold tracking-wide text-blue-800">
+                          {s.numero ||
+                            formatTeleconsultationNumero(sid, s.idHopital || tenantId)}
+                        </span>
+                        <span className="text-[10px] font-medium uppercase tracking-wider text-slate-400">
+                          {t("tele.rdvNumber", { id: sid })}
+                        </span>
+                      </div>
+                      <p className="mt-1 truncate font-display text-sm font-semibold text-slate-900">
                         {isPatient ? s.doctor : s.patient}
                       </p>
-                      <p className="mt-0.5 truncate text-xs text-slate-500">{s.reason}</p>
+                      <p className="mt-0.5 truncate text-xs text-slate-500">
+                        {s.label ||
+                          formatTeleconsultationLabel(
+                            sid,
+                            s.idHopital || tenantId,
+                            s.reason,
+                            locale === "en" ? "en" : "fr",
+                          )}
+                      </p>
                       <div className="mt-3 flex flex-wrap items-center gap-2">
                         <Button
                           size="sm"

@@ -18,6 +18,10 @@ import {
 } from "lucide-react"
 import { Button, Avatar } from "@/components/ui/primitives"
 import { cn, initials, formatDateTime } from "@/lib/utils"
+import {
+  formatTeleconsultationLabel,
+  formatTeleconsultationNumero,
+} from "@/lib/teleconsultation"
 import { MediaSecureContextBanner } from "@/components/MediaSecureContextBanner"
 
 const HERO_IMAGE =
@@ -44,14 +48,25 @@ function ControlButton({ active, danger, onClick, icon: Icon, label, disabled })
   )
 }
 
-function SessionRow({ session, isActive, onJoin, t, index }) {
+function SessionRow({ session, isActive, onJoin, t, index, locale = "fr", tenantId }) {
+  const idRdv = session.idRdv || session.id
+  const numero =
+    session.numero || formatTeleconsultationNumero(idRdv, session.idHopital || tenantId)
+  const label =
+    session.label ||
+    formatTeleconsultationLabel(
+      idRdv,
+      session.idHopital || tenantId,
+      session.reason,
+      locale === "en" ? "en" : "fr",
+    )
   return (
     <motion.button
       type="button"
       initial={{ opacity: 0, x: -10 }}
       animate={{ opacity: 1, x: 0 }}
       transition={{ delay: Math.min(index * 0.05, 0.25) }}
-      onClick={() => onJoin(session.idRdv || session.id, { requestCamera: true })}
+      onClick={() => onJoin(idRdv, { requestCamera: true })}
       className={cn(
         "group flex w-full items-center gap-3 border-b border-blue-900/6 py-3 text-left transition-colors",
         "hover:border-blue-600/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600/30",
@@ -77,6 +92,14 @@ function SessionRow({ session, isActive, onJoin, t, index }) {
         </span>
       </div>
       <div className="min-w-0 flex-1">
+        <div className="mb-1 flex flex-wrap items-center gap-2">
+          <span className="rounded-md bg-blue-800/10 px-2 py-0.5 font-mono text-[10px] font-bold tracking-wide text-blue-900">
+            {numero}
+          </span>
+          <span className="text-[10px] font-medium text-blue-800/45">
+            {t("tele.rdvNumber", { id: idRdv })}
+          </span>
+        </div>
         <div className="flex items-center gap-2">
           <Avatar name={session.doctor} className="h-8 w-8 text-[10px]" />
           <div className="min-w-0">
@@ -86,7 +109,7 @@ function SessionRow({ session, isActive, onJoin, t, index }) {
             >
               {session.doctor}
             </p>
-            <p className="truncate text-xs text-blue-800/55">{session.reason}</p>
+            <p className="truncate text-xs text-blue-800/55">{label}</p>
           </div>
         </div>
         {session.date && session.date !== "—" && (
@@ -149,6 +172,22 @@ export default function PatientTeleconsultationView({
   const { path } = useRolePath()
   const firstName = (user?.name || "").split(" ")[0] || t("roles.patient")
   const nextSession = upcoming[0] || null
+  const tenantId = user?.idHopital ?? (user?.tenant ? Number(user.tenant) : null)
+  const activeNumero =
+    active?.numero ||
+    (activeRdvId
+      ? formatTeleconsultationNumero(active?.idRdv || activeRdvId, active?.idHopital || tenantId)
+      : null)
+  const activeLabel =
+    active?.label ||
+    (activeRdvId
+      ? formatTeleconsultationLabel(
+          active?.idRdv || activeRdvId,
+          active?.idHopital || tenantId,
+          active?.reason,
+          locale === "en" ? "en" : "fr",
+        )
+      : null)
 
   return (
     <div className="relative -mx-3 min-h-[calc(100vh-6.5rem)] overflow-hidden pb-12 sm:-mx-4 lg:-mx-6">
@@ -398,11 +437,16 @@ export default function PatientTeleconsultationView({
               </div>
 
               {active && (
-                <div className="absolute right-4 top-4 rounded-full border border-white/10 bg-black/45 px-3 py-1.5 text-xs font-medium text-white backdrop-blur-md">
-                  <span className="flex items-center gap-1.5">
-                    <Clock className="h-3.5 w-3.5 text-sky-200" />
-                    RDV #{active.idRdv || activeRdvId}
-                  </span>
+                <div className="absolute right-4 top-4 flex max-w-[min(100%,18rem)] flex-col items-end gap-1.5">
+                  <div className="rounded-full border border-white/10 bg-black/45 px-3 py-1.5 font-mono text-xs font-semibold tracking-wide text-white backdrop-blur-md">
+                    {activeNumero}
+                  </div>
+                  <div className="rounded-full border border-white/10 bg-black/45 px-3 py-1.5 text-xs font-medium text-white backdrop-blur-md">
+                    <span className="flex items-center gap-1.5">
+                      <Clock className="h-3.5 w-3.5 text-sky-200" />
+                      {t("tele.rdvNumber", { id: active.idRdv || activeRdvId })}
+                    </span>
+                  </div>
                 </div>
               )}
 
@@ -506,13 +550,21 @@ export default function PatientTeleconsultationView({
                       >
                         {t("tele.patient.activeSession")}
                       </p>
+                      {activeNumero && (
+                        <p className="mt-1 font-mono text-xs font-bold tracking-wide text-blue-800">
+                          {activeNumero}
+                          <span className="ml-2 font-sans text-[11px] font-medium text-blue-800/50">
+                            {t("tele.rdvNumber", { id: active.idRdv || activeRdvId })}
+                          </span>
+                        </p>
+                      )}
                       <p
                         className="mt-0.5 text-lg font-semibold text-[#0b1f4a]"
                         style={{ fontFamily: '"Fraunces", "Sora", serif' }}
                       >
                         {remoteLabel}
                       </p>
-                      <p className="text-sm text-blue-800/55">{active.reason}</p>
+                      <p className="text-sm text-blue-800/55">{activeLabel || active.reason}</p>
                     </div>
                   </div>
                   {active.dateHeureRdv && (
@@ -568,6 +620,8 @@ export default function PatientTeleconsultationView({
                     onJoin={joinSession}
                     t={t}
                     index={i}
+                    locale={locale}
+                    tenantId={tenantId}
                   />
                 ))
               )}

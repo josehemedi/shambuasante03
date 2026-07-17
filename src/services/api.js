@@ -3,6 +3,10 @@
 import { http, USE_LIVE_API, getToken, getHopitalId, shouldSendHopitalHeader, API_BASE_URL } from "./httpClient"
 import { ROLE_KEYS } from "@/config/roles"
 import {
+  formatTeleconsultationLabel,
+  formatTeleconsultationNumero,
+} from "@/lib/teleconsultation"
+import {
   kpis,
   revenueSeries,
   patientFlow,
@@ -2042,12 +2046,19 @@ export const settingsService = {
 
 function mapTeleSession(rdv) {
   const item = mapDoctorAppointmentListItem(rdv)
+  const idRdv = rdv.idRdv
+  const idHopital = rdv.idHopital ?? null
+  const reason = item.reason
+  const numero = formatTeleconsultationNumero(idRdv, idHopital)
   return {
     id: item.id,
-    idRdv: rdv.idRdv,
+    idRdv,
+    idHopital,
     patient: item.patient,
     doctor: rdv.nomMedecin || "—",
-    reason: item.reason,
+    reason,
+    numero,
+    label: formatTeleconsultationLabel(idRdv, idHopital, reason, "fr"),
     time: item.time,
     date: item.date,
     dateHeureRdv: rdv.dateHeureRdv,
@@ -2060,12 +2071,21 @@ function mapTeleSession(rdv) {
 
 function mapPatientTeleSession(appointment) {
   const dateTime = appointment.dateHeureRdv ? new Date(appointment.dateHeureRdv) : null
+  const idRdv = appointment.idRdv
+  const idHopital = appointment.idHopital ?? getHopitalId() ?? null
+  const reason = appointment.motifVisite || appointment.type || "—"
+  const numero =
+    appointment.numeroTeleconsultation ||
+    formatTeleconsultationNumero(idRdv, idHopital)
   return {
-    id: appointment.idRdv,
-    idRdv: appointment.idRdv,
+    id: idRdv,
+    idRdv,
+    idHopital,
     patient: "—",
     doctor: appointment.nomMedecin || appointment.doctorName || "—",
-    reason: appointment.motifVisite || appointment.type || "—",
+    reason,
+    numero,
+    label: formatTeleconsultationLabel(idRdv, idHopital, reason, "fr"),
     time:
       dateTime && !Number.isNaN(dateTime.getTime())
         ? dateTime.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })
