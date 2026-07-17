@@ -39,7 +39,6 @@ import {
 } from "@/services/medecinQueueLiveClient"
 import { cn } from "@/lib/utils"
 import { useRolePath } from "@/hooks/useRolePath"
-import { playAndAnnounceWaitingRoomCall } from "@/lib/waitingRoomAudio"
 
 const MySwal = withReactContent(Swal)
 
@@ -179,17 +178,7 @@ export default function DoctorDashboard() {
         }
       })
       const isRecall = Boolean(event?.rappel) || item.statut === "APPELE"
-      // Son + annonce immédiatement au clic (geste utilisateur = autoplay OK)
-      await playAndAnnounceWaitingRoomCall(
-        {
-          ...(event || {}),
-          numeroPassage: numero,
-          salle,
-          patientNom: event?.patientNom || item.patient || item.patientNom || "",
-          rappel: isRecall,
-        },
-        locale,
-      )
+      // Son + annonce : uniquement côté réceptionniste (WebSocket) et afficheur TV
       await MySwal.fire({
         icon: "success",
         title: isRecall ? t("waitingRoom.recallSuccessTitle") : t("waitingRoom.callSuccessTitle"),

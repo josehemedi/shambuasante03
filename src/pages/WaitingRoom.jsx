@@ -26,7 +26,6 @@ import {
   disconnectMedecinQueueLiveClient,
 } from "@/services/medecinQueueLiveClient"
 import { cn } from "@/lib/utils"
-import { playAndAnnounceWaitingRoomCall } from "@/lib/waitingRoomAudio"
 
 const MySwal = withReactContent(Swal)
 
@@ -174,16 +173,7 @@ export default function WaitingRoom() {
           }),
         )
         const isRecall = Boolean(event?.rappel) || item.statut === "APPELE"
-        await playAndAnnounceWaitingRoomCall(
-          {
-            ...(event || {}),
-            numeroPassage: numero,
-            salle,
-            patientNom: event?.patientNom || item.patient || item.patientNom || "",
-            rappel: isRecall,
-          },
-          locale,
-        )
+        // Son + annonce : uniquement côté réceptionniste (WebSocket) et afficheur TV
         await MySwal.fire({
           icon: "success",
           title: isRecall ? t("waitingRoom.recallSuccessTitle") : t("waitingRoom.callSuccessTitle"),
