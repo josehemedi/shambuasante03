@@ -12,6 +12,7 @@ import Patients from "@/pages/Patients"
 import PatientDetail from "@/pages/PatientDetail"
 import Teleconsultation from "@/pages/Teleconsultation"
 import AiAssistant from "@/pages/AiAssistant"
+import RagAdmin from "@/pages/RagAdmin"
 import UserManagement from "@/pages/UserManagement"
 import SystemMonitoring from "@/pages/SystemMonitoring"
 import AiAnalytics from "@/pages/AiAnalytics"
@@ -40,7 +41,6 @@ import SampleTracking from "@/pages/SampleTracking"
 import Billing from "@/pages/Billing"
 import HospitalTariffs from "@/pages/HospitalTariffs"
 import CashierDesk from "@/pages/CashierDesk"
-import Messages from "@/pages/Messages"
 import WaitingRoom from "@/pages/WaitingRoom"
 import WaitingRoomDisplay from "@/pages/WaitingRoomDisplay"
 
@@ -67,6 +67,7 @@ const ROLE_CHILD_ROUTES = [
   { path: "patients/:id", element: <Guard><PatientDetail /></Guard> },
   { path: "teleconsultation", element: <Guard><Teleconsultation /></Guard> },
   { path: "ai-assistant", element: <Guard><AiAssistant /></Guard> },
+  { path: "rag-admin", element: <Guard><RagAdmin /></Guard> },
   { path: "users", element: <Guard><UserManagement /></Guard> },
   { path: "system-monitoring", element: <Guard><SystemMonitoring /></Guard> },
   { path: "laboratory", element: <Guard><Laboratory /></Guard> },
@@ -75,7 +76,6 @@ const ROLE_CHILD_ROUTES = [
   { path: "pharmacy", element: <Guard><Pharmacy /></Guard> },
   { path: "billing", element: <Guard><Billing /></Guard> },
   { path: "tariffs", element: <Guard><HospitalTariffs /></Guard> },
-  { path: "messages", element: <Guard><Messages /></Guard> },
   { path: "cashier", element: <Guard><CashierDesk /></Guard> },
   { path: "my-subscription", element: <Guard><MySubscription /></Guard> },
   { path: "test-requests", element: <Guard><TestRequests /></Guard> },

@@ -56,7 +56,7 @@ export default function ScheduleTeleconsultationModal({ isOpen, onClose, onSave,
       }
     }
 
-    const loadPatients = patientService.listAccessible(hopitalId, { roleKey })
+    const loadPatients = patientService.listAccessible(hopitalId, { roleKey, mine: true })
 
     loadPatients
       .then((list) => {
@@ -113,13 +113,22 @@ export default function ScheduleTeleconsultationModal({ isOpen, onClose, onSave,
                 <SelectValue placeholder={t("tele.scheduleSelectPatient")} />
               </SelectTrigger>
               <SelectContent>
-                {patients.map((p) => (
-                  <SelectItem key={p._backendId ?? p.id} value={String(p._backendId ?? p.id)}>
-                    {p.name} ({p.id})
+                {patients.length === 0 && !patientsLoading ? (
+                  <SelectItem value="__empty__" disabled>
+                    {t("appointments.noAssignedPatients")}
                   </SelectItem>
-                ))}
+                ) : (
+                  patients.map((p) => (
+                    <SelectItem key={p._backendId ?? p.id} value={String(p._backendId ?? p.id)}>
+                      {p.name} ({p.id})
+                    </SelectItem>
+                  ))
+                )}
               </SelectContent>
             </Select>
+            <p className="mt-1.5 text-xs text-muted-foreground">
+              {t("appointments.assignedPatientsOnly")}
+            </p>
           </div>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

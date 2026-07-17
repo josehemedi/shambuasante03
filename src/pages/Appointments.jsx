@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react"
-import { useNavigate } from "react-router-dom"
 import { motion } from "framer-motion"
+import { useRolePath } from "@/hooks/useRolePath"
 import {
   Search,
   Plus,
@@ -386,7 +386,7 @@ function EmptyState({ t, hasFilters, onClear }) {
 
 export default function Appointments() {
   const { t, lang, locale } = useI18n()
-  const navigate = useNavigate()
+  const { go } = useRolePath()
   const { user, roleKey } = useAuth()
   const isPatient = roleKey === ROLE_KEYS.PATIENT
   const isDoctor = roleKey === ROLE_KEYS.DOCTOR
@@ -481,10 +481,10 @@ export default function Appointments() {
   const handleJoin = (appointment) => {
     if (!appointment?.id) return
     if (appointment.isTele || appointment.mode === "Teleconsultation" || appointment.canal === "TELECONSULTATION") {
-      navigate(`/teleconsultation?rdv=${appointment.id}`)
+      go(`/teleconsultation?rdv=${appointment.id}`)
       return
     }
-    navigate(`/doctor-workspace?rdv=${appointment.id}`)
+    go(`/doctor-workspace?rdv=${appointment.id}`)
   }
 
   const handleComplete = async (appointment) => {

@@ -1,17 +1,152 @@
-import { useEffect, useState } from "react"
-import { FileText, Loader2, Pill, Plus, QrCode, Trash2, X } from "lucide-react"
+import { useEffect, useMemo, useState } from "react"
+import {
+  FileText,
+  Loader2,
+  Plus,
+  Printer,
+  Trash2,
+  X,
+} from "lucide-react"
 import { AnimatedModal } from "@/components/ui/AnimatedModal"
 import { Button, Badge, Input } from "@/components/ui/primitives"
+import { useAuth } from "@/auth/AuthProvider"
+import { useTenantScope } from "@/hooks/useTenantScope"
 import { ordonnanceService } from "@/services/api"
-import { formatDateTime } from "@/lib/utils"
+import { cn, formatDateTime } from "@/lib/utils"
+
+const VOIES = ["Orale", "IV", "IM", "SC", "Topique", "Inhalée", "Autre"]
 
 function emptyMed() {
-  return { name: "", dosage: "", frequency: "" }
+  return {
+    name: "",
+    dosage: "",
+    frequency: "",
+    duration: "",
+    route: "Orale",
+  }
+}
+
+function formatMedLine(m, index) {
+  const parts = [
+    m.name.trim(),
+    m.dosage.trim() && `${m.dosage.trim()}`,
+    m.route.trim() && `voie ${m.route.trim()}`,
+    m.frequency.trim() && m.frequency.trim(),
+    m.duration.trim() && `pendant ${m.duration.trim()}`,
+  ].filter(Boolean)
+  return `${index + 1}. ${parts.join(" — ")}`
+}
+
+function PrescriptionDocument({
+  hospitalName,
+  doctorName,
+  doctorSpecialty,
+  patientName,
+  diagnostic,
+  medLines,
+  observations,
+  dateLabel,
+  numero,
+  labContext,
+  className,
+}) {
+  return (
+    <article
+      className={cn(
+        "relative overflow-hidden rounded-sm border border-slate-300 bg-[#fbfbf9] text-slate-900 shadow-sm",
+        className,
+      )}
+    >
+      <div className="border-b-2 border-slate-800 px-6 py-5">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="font-display text-lg font-bold tracking-tight text-slate-900">
+              {hospitalName}
+            </p>
+            <p className="mt-0.5 text-[11px] font-medium uppercase tracking-[0.14em] text-slate-500">
+              Service de consultation · Ordonnance médicale
+            </p>
+          </div>
+          <div className="text-right text-xs text-slate-600">
+            <p className="font-semibold text-slate-800">ORDONNANCE</p>
+            {numero && <p className="mt-0.5 font-mono text-[11px]">{numero}</p>}
+            {dateLabel && <p className="mt-0.5">{dateLabel}</p>}
+          </div>
+        </div>
+      </div>
+
+      <div className="grid gap-4 border-b border-slate-200 px-6 py-4 sm:grid-cols-2">
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Médecin prescripteur</p>
+          <p className="mt-1 text-sm font-semibold text-slate-900">{doctorName || "—"}</p>
+          {doctorSpecialty && <p className="text-xs text-slate-600">{doctorSpecialty}</p>}
+        </div>
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Patient</p>
+          <p className="mt-1 text-sm font-semibold text-slate-900">{patientName || "—"}</p>
+          {labContext && <p className="mt-1 text-xs leading-relaxed text-slate-600">{labContext}</p>}
+        </div>
+      </div>
+
+      {diagnostic && (
+        <div className="border-b border-slate-200 px-6 py-3">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Diagnostic</p>
+          <p className="mt-1 text-sm text-slate-800">{diagnostic}</p>
+        </div>
+      )}
+
+      <div className="px-6 py-5">
+        <div className="mb-4 flex items-end gap-3">
+          <span className="font-display text-4xl font-bold leading-none text-slate-900">Rp/</span>
+          <span className="pb-1 text-xs font-medium uppercase tracking-wider text-slate-500">
+            Prescription
+          </span>
+        </div>
+
+        {medLines.length === 0 ? (
+          <p className="text-sm italic text-slate-400">Aucun médicament prescrit.</p>
+        ) : (
+          <ol className="space-y-3">
+            {medLines.map((line, i) => (
+              <li key={i} className="flex gap-3 border-b border-dotted border-slate-300 pb-3 last:border-0">
+                <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-slate-400 text-xs font-semibold">
+                  {i + 1}
+                </span>
+                <p className="text-sm leading-relaxed text-slate-900">{line.replace(/^\d+\.\s*/, "")}</p>
+              </li>
+            ))}
+          </ol>
+        )}
+
+        {observations && (
+          <div className="mt-5 rounded-sm border border-slate-200 bg-white/70 px-3 py-2.5">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+              Conseils & observations
+            </p>
+            <p className="mt-1 whitespace-pre-wrap text-sm text-slate-700">{observations}</p>
+          </div>
+        )}
+
+        <div className="mt-10 flex justify-end">
+          <div className="w-48 text-center">
+            <div className="mb-8 h-12 border-b border-slate-400" />
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+              Signature & cachet
+            </p>
+            <p className="mt-1 text-xs text-slate-600">{doctorName || "Médecin"}</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="border-t border-slate-200 bg-slate-50 px-6 py-2 text-center text-[10px] text-slate-500">
+        Document confidentiel — usage médical uniquement · {hospitalName}
+      </div>
+    </article>
+  )
 }
 
 /**
- * Prescription médicaments + affichage des ordonnances du patient (tenant courant).
- * Icône QR / PDF JasperReports pour chaque ordonnance enregistrée.
+ * Ordonnance médicale professionnelle (prescription + historique PDF).
  */
 export default function PrescriptionOrdonnanceModal({
   open,
@@ -22,7 +157,9 @@ export default function PrescriptionOrdonnanceModal({
   diagnosticHint = "",
   labContext = "",
 }) {
-  const [tab, setTab] = useState("prescribe") // prescribe | view
+  const { user } = useAuth()
+  const { hospitalName } = useTenantScope()
+  const [tab, setTab] = useState("prescribe")
   const [meds, setMeds] = useState([emptyMed()])
   const [observations, setObservations] = useState("")
   const [diagnostic, setDiagnostic] = useState(diagnosticHint || "")
@@ -30,8 +167,11 @@ export default function PrescriptionOrdonnanceModal({
   const [error, setError] = useState("")
   const [ordonnances, setOrdonnances] = useState([])
   const [loadingList, setLoadingList] = useState(false)
-  const [lastCreated, setLastCreated] = useState(null)
+  const [selectedOrdo, setSelectedOrdo] = useState(null)
   const [pdfLoadingId, setPdfLoadingId] = useState(null)
+
+  const doctorName = user?.name || "Médecin"
+  const doctorSpecialty = user?.specialty || user?.specialite || ""
 
   useEffect(() => {
     if (!open) return
@@ -40,7 +180,7 @@ export default function PrescriptionOrdonnanceModal({
     setObservations("")
     setDiagnostic(diagnosticHint || "")
     setError("")
-    setLastCreated(null)
+    setSelectedOrdo(null)
     setPdfLoadingId(null)
     if (idPatient) loadOrdonnances()
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -59,16 +199,17 @@ export default function PrescriptionOrdonnanceModal({
     }
   }
 
-  const buildContenu = () =>
-    meds
-      .filter((m) => m.name.trim())
-      .map(
-        (m, i) =>
-          `${i + 1}) ${m.name.trim()}${m.dosage ? ` — ${m.dosage.trim()}` : ""}${
-            m.frequency ? ` — ${m.frequency.trim()}` : ""
-          }`,
-      )
-      .join("\n")
+  const filledMeds = useMemo(
+    () => meds.filter((m) => m.name.trim()),
+    [meds],
+  )
+
+  const previewLines = useMemo(
+    () => filledMeds.map((m, i) => formatMedLine(m, i)),
+    [filledMeds],
+  )
+
+  const buildContenu = () => previewLines.join("\n")
 
   const openJasperPdf = async (idOrdonnance) => {
     if (!idOrdonnance) return
@@ -77,7 +218,7 @@ export default function PrescriptionOrdonnanceModal({
     try {
       await ordonnanceService.openPdf(idOrdonnance)
     } catch (err) {
-      setError(err?.message || "Impossible d'ouvrir le PDF Jasper (QR).")
+      setError(err?.message || "Impossible d'ouvrir le PDF de l'ordonnance.")
     } finally {
       setPdfLoadingId(null)
     }
@@ -97,7 +238,7 @@ export default function PrescriptionOrdonnanceModal({
     setSaving(true)
     setError("")
     try {
-      const notes = [observations.trim(), labContext ? `Contexte labo : ${labContext}` : ""]
+      const notes = [observations.trim(), labContext ? `Contexte clinique : ${labContext}` : ""]
         .filter(Boolean)
         .join("\n")
       await ordonnanceService.create({
@@ -107,24 +248,15 @@ export default function PrescriptionOrdonnanceModal({
         contenuOrdonnance: contenu.trim(),
         observations: notes || null,
       })
-      const preview = {
-        contenuOrdonnance: contenu.trim(),
-        diagnostic: diagnostic.trim(),
-        observations: notes,
-        patientName,
-        datePrescription: new Date().toISOString(),
-        statut: "ACTIVE",
-      }
-      setLastCreated(preview)
       const list = await ordonnanceService.listByPatient(idPatient)
       const next = Array.isArray(list) ? list : []
       setOrdonnances(next)
-      setTab("view")
       setMeds([emptyMed()])
       setObservations("")
+      setTab("view")
       const newest = next[0]
+      if (newest) setSelectedOrdo(newest)
       if (newest?.idOrdonnance) {
-        // Ouvre automatiquement le PDF Jasper + QR après création
         await openJasperPdf(newest.idOrdonnance)
       }
     } catch (err) {
@@ -137,257 +269,368 @@ export default function PrescriptionOrdonnanceModal({
   if (!open) return null
 
   return (
-    <AnimatedModal open={open} onClose={onClose} contentClassName="max-w-2xl" zIndex={10000}>
-      <div className="w-full overflow-hidden rounded-2xl border border-border bg-card shadow-2xl">
-        <div className="relative overflow-hidden bg-gradient-to-br from-teal-800 via-teal-700 to-sky-800 px-5 py-5 text-white">
-          <div className="pointer-events-none absolute -right-8 -top-8 h-28 w-28 rounded-full bg-white/10 blur-2xl" />
-          <div className="relative flex items-start justify-between gap-3">
-            <div className="flex items-start gap-3">
-              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white/15">
-                <Pill className="h-5 w-5" />
-              </div>
-              <div>
-                <p className="text-[11px] font-semibold uppercase tracking-wider text-white/70">
-                  Ordonnance médicale
-                </p>
-                <h2 className="font-display text-lg font-bold">{patientName || "Patient"}</h2>
-                {labContext && <p className="text-xs text-white/75">Liée à : {labContext}</p>}
-              </div>
+    <AnimatedModal open={open} onClose={onClose} contentClassName="max-w-5xl" zIndex={10000}>
+      <div className="flex max-h-[92vh] w-full flex-col overflow-hidden rounded-xl border border-border bg-card shadow-2xl">
+        <header className="flex shrink-0 items-center justify-between gap-3 border-b border-border px-5 py-3.5">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+              Prescription médicale
+            </p>
+            <h2 className="font-display text-lg font-bold text-foreground">
+              Ordonnance — {patientName || "Patient"}
+            </h2>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="mr-2 hidden rounded-lg border border-border p-0.5 sm:flex">
+              <button
+                type="button"
+                onClick={() => setTab("prescribe")}
+                className={cn(
+                  "rounded-md px-3 py-1.5 text-xs font-semibold transition-colors",
+                  tab === "prescribe"
+                    ? "bg-foreground text-background"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                Rédiger
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setTab("view")
+                  loadOrdonnances()
+                }}
+                className={cn(
+                  "rounded-md px-3 py-1.5 text-xs font-semibold transition-colors",
+                  tab === "view"
+                    ? "bg-foreground text-background"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                Historique
+              </button>
             </div>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 border border-white/20 bg-white/10 text-white hover:bg-white/20"
-              onClick={onClose}
-            >
+            <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={onClose}>
               <X className="h-4 w-4" />
             </Button>
           </div>
-          <div className="relative mt-4 flex gap-2">
-            <button
-              type="button"
-              onClick={() => setTab("prescribe")}
-              className={`rounded-full px-3 py-1.5 text-xs font-semibold ${
-                tab === "prescribe" ? "bg-white text-teal-900" : "bg-white/15 text-white"
-              }`}
-            >
-              Prescrire
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setTab("view")
-                loadOrdonnances()
-              }}
-              className={`rounded-full px-3 py-1.5 text-xs font-semibold ${
-                tab === "view" ? "bg-white text-teal-900" : "bg-white/15 text-white"
-              }`}
-            >
-              Voir ordonnances
-            </button>
-          </div>
+        </header>
+
+        <div className="flex gap-1 border-b border-border px-4 py-2 sm:hidden">
+          <button
+            type="button"
+            onClick={() => setTab("prescribe")}
+            className={cn(
+              "flex-1 rounded-md px-3 py-2 text-xs font-semibold",
+              tab === "prescribe" ? "bg-foreground text-background" : "bg-muted text-muted-foreground",
+            )}
+          >
+            Rédiger
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setTab("view")
+              loadOrdonnances()
+            }}
+            className={cn(
+              "flex-1 rounded-md px-3 py-2 text-xs font-semibold",
+              tab === "view" ? "bg-foreground text-background" : "bg-muted text-muted-foreground",
+            )}
+          >
+            Historique
+          </button>
         </div>
 
-        {tab === "prescribe" ? (
-          <form onSubmit={handleSave} className="space-y-4 p-5">
-            {error && (
-              <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-                {error}
-              </div>
-            )}
-            <label className="block space-y-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Diagnostic
-              <Input
-                className="h-10 normal-case tracking-normal"
-                value={diagnostic}
-                onChange={(e) => setDiagnostic(e.target.value)}
-                placeholder="Diagnostic associé…"
-              />
-            </label>
+        {error && (
+          <div className="mx-5 mt-3 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+            {error}
+          </div>
+        )}
 
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Médicaments
-                </p>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setMeds((p) => [...p, emptyMed()])}
-                >
-                  <Plus className="h-3.5 w-3.5" /> Ajouter
-                </Button>
-              </div>
-              {meds.map((med, index) => (
-                <div
-                  key={index}
-                  className="grid gap-2 rounded-xl border border-border/70 bg-muted/10 p-3 sm:grid-cols-[1.2fr_1fr_1fr_auto]"
-                >
-                  <Input
-                    placeholder="Médicament"
-                    value={med.name}
-                    onChange={(e) =>
-                      setMeds((prev) =>
-                        prev.map((m, i) => (i === index ? { ...m, name: e.target.value } : m)),
-                      )
-                    }
-                  />
-                  <Input
-                    placeholder="Posologie"
-                    value={med.dosage}
-                    onChange={(e) =>
-                      setMeds((prev) =>
-                        prev.map((m, i) => (i === index ? { ...m, dosage: e.target.value } : m)),
-                      )
-                    }
-                  />
-                  <Input
-                    placeholder="Fréquence"
-                    value={med.frequency}
-                    onChange={(e) =>
-                      setMeds((prev) =>
-                        prev.map((m, i) => (i === index ? { ...m, frequency: e.target.value } : m)),
-                      )
-                    }
-                  />
+        {tab === "prescribe" ? (
+          <form onSubmit={handleSave} className="grid min-h-0 flex-1 overflow-hidden lg:grid-cols-2">
+            <div className="space-y-4 overflow-y-auto border-b border-border p-5 lg:border-b-0 lg:border-r">
+              <label className="block space-y-1.5">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  Diagnostic clinique
+                </span>
+                <Input
+                  value={diagnostic}
+                  onChange={(e) => setDiagnostic(e.target.value)}
+                  placeholder="Ex. Hypertension artérielle essentielle…"
+                />
+              </label>
+
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    Lignes de prescription
+                  </p>
                   <Button
                     type="button"
-                    size="icon"
-                    variant="ghost"
-                    onClick={() =>
-                      setMeds((prev) => (prev.length <= 1 ? [emptyMed()] : prev.filter((_, i) => i !== index)))
-                    }
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setMeds((p) => [...p, emptyMed()])}
                   >
-                    <Trash2 className="h-4 w-4" />
+                    <Plus className="h-3.5 w-3.5" />
+                    Médicament
                   </Button>
                 </div>
-              ))}
+
+                {meds.map((med, index) => (
+                  <div
+                    key={index}
+                    className="space-y-2 rounded-lg border border-border bg-muted/20 p-3"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold text-foreground">Ligne {index + 1}</span>
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="ghost"
+                        className="h-7 w-7"
+                        onClick={() =>
+                          setMeds((prev) =>
+                            prev.length <= 1 ? [emptyMed()] : prev.filter((_, i) => i !== index),
+                          )
+                        }
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                    <Input
+                      placeholder="Dénomination du médicament (DCI ou spécialité)"
+                      value={med.name}
+                      onChange={(e) =>
+                        setMeds((prev) =>
+                          prev.map((m, i) => (i === index ? { ...m, name: e.target.value } : m)),
+                        )
+                      }
+                    />
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      <Input
+                        placeholder="Dosage / forme (ex. 500 mg cp)"
+                        value={med.dosage}
+                        onChange={(e) =>
+                          setMeds((prev) =>
+                            prev.map((m, i) => (i === index ? { ...m, dosage: e.target.value } : m)),
+                          )
+                        }
+                      />
+                      <select
+                        className="h-10 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        value={med.route}
+                        onChange={(e) =>
+                          setMeds((prev) =>
+                            prev.map((m, i) => (i === index ? { ...m, route: e.target.value } : m)),
+                          )
+                        }
+                      >
+                        {VOIES.map((v) => (
+                          <option key={v} value={v}>
+                            Voie {v}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      <Input
+                        placeholder="Posologie (ex. 1 cp × 3/j)"
+                        value={med.frequency}
+                        onChange={(e) =>
+                          setMeds((prev) =>
+                            prev.map((m, i) =>
+                              i === index ? { ...m, frequency: e.target.value } : m,
+                            ),
+                          )
+                        }
+                      />
+                      <Input
+                        placeholder="Durée (ex. 7 jours)"
+                        value={med.duration}
+                        onChange={(e) =>
+                          setMeds((prev) =>
+                            prev.map((m, i) =>
+                              i === index ? { ...m, duration: e.target.value } : m,
+                            ),
+                          )
+                        }
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <label className="block space-y-1.5">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  Conseils au patient
+                </span>
+                <textarea
+                  className="min-h-[88px] w-full rounded-xl border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  value={observations}
+                  onChange={(e) => setObservations(e.target.value)}
+                  placeholder="Hydratation, prise pendant les repas, vigilance…"
+                />
+              </label>
             </div>
 
-            <label className="block space-y-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Observations / conseils
-              <textarea
-                className="min-h-[80px] w-full rounded-xl border border-input bg-background px-3 py-2 text-sm font-normal normal-case tracking-normal outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                value={observations}
-                onChange={(e) => setObservations(e.target.value)}
-                placeholder="Conseils au patient…"
-              />
-            </label>
-
-            <div className="flex justify-end gap-2 border-t border-border pt-4">
-              <Button type="button" variant="outline" onClick={onClose} disabled={saving}>
-                Fermer
-              </Button>
-              <Button type="submit" className="gap-1.5 bg-teal-800 hover:bg-teal-700" disabled={saving}>
-                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
-                Enregistrer l&apos;ordonnance
-              </Button>
+            <div className="flex min-h-0 flex-col overflow-hidden bg-slate-100/80 p-4 sm:p-5">
+              <p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Aperçu de l&apos;ordonnance
+              </p>
+              <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+                <PrescriptionDocument
+                  hospitalName={hospitalName}
+                  doctorName={doctorName}
+                  doctorSpecialty={doctorSpecialty}
+                  patientName={patientName}
+                  diagnostic={diagnostic}
+                  medLines={previewLines}
+                  observations={observations}
+                  dateLabel={new Date().toLocaleDateString("fr-FR", {
+                    day: "2-digit",
+                    month: "long",
+                    year: "numeric",
+                  })}
+                  labContext={labContext}
+                />
+              </div>
+              <div className="mt-4 flex shrink-0 justify-end gap-2 border-t border-border/60 pt-4">
+                <Button type="button" variant="outline" onClick={onClose} disabled={saving}>
+                  Annuler
+                </Button>
+                <Button type="submit" className="gap-1.5" disabled={saving || filledMeds.length === 0}>
+                  {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
+                  Valider &amp; PDF
+                </Button>
+              </div>
             </div>
           </form>
         ) : (
-          <div className="space-y-4 p-5">
-            {error && (
-              <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-                {error}
+          <div className="grid min-h-0 flex-1 overflow-hidden lg:grid-cols-[minmax(0,17rem)_1fr]">
+            <aside className="overflow-y-auto border-b border-border p-4 lg:border-b-0 lg:border-r">
+              <div className="mb-3 flex items-center justify-between gap-2">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  Historique
+                </p>
+                <Button type="button" size="sm" variant="outline" onClick={loadOrdonnances} disabled={loadingList}>
+                  {loadingList ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                  Actualiser
+                </Button>
               </div>
-            )}
 
-            {lastCreated && (
-              <div className="rounded-2xl border border-emerald-500/25 bg-emerald-500/5 p-4">
-                <div className="mb-2 flex items-center gap-2">
-                  <Badge variant="success">Nouvelle ordonnance</Badge>
+              {loadingList ? (
+                <div className="flex items-center gap-2 py-8 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" /> Chargement…
                 </div>
-                {lastCreated.diagnostic && (
-                  <p className="text-xs text-muted-foreground">Diagnostic : {lastCreated.diagnostic}</p>
-                )}
-                <pre className="mt-2 whitespace-pre-wrap font-sans text-sm text-foreground">
-                  {lastCreated.contenuOrdonnance}
-                </pre>
-                {lastCreated.observations && (
-                  <p className="mt-2 text-xs text-muted-foreground">{lastCreated.observations}</p>
-                )}
-              </div>
-            )}
-
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold">Ordonnances du patient</h3>
-              <Button type="button" size="sm" variant="outline" onClick={loadOrdonnances} disabled={loadingList}>
-                {loadingList ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
-                Actualiser
-              </Button>
-            </div>
-
-            {loadingList ? (
-              <div className="flex items-center gap-2 py-8 text-sm text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin" /> Chargement…
-              </div>
-            ) : ordonnances.length === 0 ? (
-              <p className="rounded-xl border border-dashed border-border py-10 text-center text-sm text-muted-foreground">
-                Aucune ordonnance pour ce patient dans votre établissement.
-              </p>
-            ) : (
-              <ul className="max-h-[360px] space-y-3 overflow-y-auto">
-                {ordonnances.map((o) => {
-                  const id = o.idOrdonnance
-                  const loadingPdf = pdfLoadingId === id
-                  return (
-                    <li
-                      key={id || o.numeroOrdonnance || o.datePrescription}
-                      className="rounded-xl border border-border/70 bg-muted/10 p-4"
-                    >
-                      <div className="flex flex-wrap items-start justify-between gap-2">
-                        <div className="min-w-0 flex-1">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="font-mono text-xs text-muted-foreground">
+              ) : ordonnances.length === 0 ? (
+                <p className="rounded-lg border border-dashed border-border px-3 py-8 text-center text-sm text-muted-foreground">
+                  Aucune ordonnance enregistrée pour ce patient.
+                </p>
+              ) : (
+                <ul className="space-y-2">
+                  {ordonnances.map((o) => {
+                    const id = o.idOrdonnance
+                    const active = selectedOrdo?.idOrdonnance === id
+                    return (
+                      <li key={id || o.numeroOrdonnance || o.datePrescription}>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedOrdo(o)}
+                          className={cn(
+                            "w-full rounded-lg border px-3 py-2.5 text-left transition-colors",
+                            active
+                              ? "border-foreground/30 bg-muted"
+                              : "border-border/70 hover:border-foreground/20 hover:bg-muted/40",
+                          )}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-mono text-[11px] text-muted-foreground">
                               {o.numeroOrdonnance || `ORD-${id || "—"}`}
                             </span>
-                            <Badge variant={o.statut === "ACTIVE" ? "success" : "secondary"}>
+                            <Badge variant={o.statut === "ACTIVE" ? "success" : "secondary"} className="text-[10px]">
                               {o.statut || "ACTIVE"}
                             </Badge>
                           </div>
-                          <p className="mt-1 text-xs text-muted-foreground">
+                          <p className="mt-1 text-xs text-foreground">
                             {formatDateTime(o.datePrescription)}
-                            {o.diagnostic ? ` · ${o.diagnostic}` : ""}
                           </p>
-                        </div>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          title="Ouvrir l'ordonnance PDF JasperReports (avec code QR)"
-                          className="h-9 shrink-0 gap-1.5 border-teal-700/30 bg-teal-50 text-teal-900 hover:bg-teal-100"
-                          disabled={!id || loadingPdf}
-                          onClick={() => openJasperPdf(id)}
-                        >
-                          {loadingPdf ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <QrCode className="h-4 w-4" />
+                          {o.diagnostic && (
+                            <p className="mt-0.5 line-clamp-1 text-[11px] text-muted-foreground">
+                              {o.diagnostic}
+                            </p>
                           )}
-                          PDF
-                        </Button>
-                      </div>
-                      <pre className="mt-2 whitespace-pre-wrap font-sans text-sm text-foreground">
-                        {o.contenuOrdonnance || "—"}
-                      </pre>
-                      {o.observations && (
-                        <p className="mt-2 text-xs text-muted-foreground">{o.observations}</p>
-                      )}
-                    </li>
-                  )
-                })}
-              </ul>
-            )}
+                        </button>
+                      </li>
+                    )
+                  })}
+                </ul>
+              )}
 
-            <div className="flex justify-end gap-2 border-t border-border pt-4">
-              <Button type="button" variant="outline" onClick={() => setTab("prescribe")}>
-                Nouvelle prescription
+              <Button
+                type="button"
+                variant="outline"
+                className="mt-4 w-full"
+                onClick={() => setTab("prescribe")}
+              >
+                <Plus className="h-3.5 w-3.5" />
+                Nouvelle ordonnance
               </Button>
-              <Button type="button" onClick={onClose}>
-                Fermer
-              </Button>
+            </aside>
+
+            <div className="flex min-h-0 flex-col overflow-hidden bg-slate-100/80 p-4 sm:p-5">
+              {selectedOrdo ? (
+                <>
+                  <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      Document sélectionné
+                    </p>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="gap-1.5"
+                      disabled={!selectedOrdo.idOrdonnance || pdfLoadingId === selectedOrdo.idOrdonnance}
+                      onClick={() => openJasperPdf(selectedOrdo.idOrdonnance)}
+                    >
+                      {pdfLoadingId === selectedOrdo.idOrdonnance ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Printer className="h-3.5 w-3.5" />
+                      )}
+                      Imprimer PDF
+                    </Button>
+                  </div>
+                  <div className="min-h-0 flex-1 overflow-y-auto">
+                    <PrescriptionDocument
+                      hospitalName={hospitalName}
+                      doctorName={doctorName}
+                      doctorSpecialty={doctorSpecialty}
+                      patientName={patientName}
+                      diagnostic={selectedOrdo.diagnostic || ""}
+                      medLines={String(selectedOrdo.contenuOrdonnance || "")
+                        .split("\n")
+                        .map((l) => l.trim())
+                        .filter(Boolean)}
+                      observations={selectedOrdo.observations || ""}
+                      dateLabel={formatDateTime(selectedOrdo.datePrescription)}
+                      numero={selectedOrdo.numeroOrdonnance || `ORD-${selectedOrdo.idOrdonnance || "—"}`}
+                      labContext={labContext}
+                    />
+                  </div>
+                </>
+              ) : (
+                <div className="flex flex-1 flex-col items-center justify-center gap-2 text-center text-sm text-muted-foreground">
+                  <FileText className="h-8 w-8 opacity-40" />
+                  <p>Sélectionnez une ordonnance dans l&apos;historique pour l&apos;afficher.</p>
+                </div>
+              )}
+              <div className="mt-4 flex shrink-0 justify-end border-t border-border/60 pt-4">
+                <Button type="button" onClick={onClose}>
+                  Fermer
+                </Button>
+              </div>
             </div>
           </div>
         )}

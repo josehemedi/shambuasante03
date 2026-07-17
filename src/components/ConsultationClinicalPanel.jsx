@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { useNavigate } from "react-router-dom"
+import { useRolePath } from "@/hooks/useRolePath"
 import { motion } from "framer-motion"
 import {
   Activity,
@@ -99,7 +99,7 @@ export default function ConsultationClinicalPanel({
 }) {
   const { t } = useI18n()
   const { user } = useAuth()
-  const navigate = useNavigate()
+  const { go } = useRolePath()
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [sendingLab, setSendingLab] = useState(false)
@@ -656,7 +656,7 @@ export default function ConsultationClinicalPanel({
                         <Pill className="h-3.5 w-3.5" />
                         Ordonnance
                       </Button>
-                      <Button size="sm" variant="ghost" onClick={() => navigate("/records")}>
+                      <Button size="sm" variant="ghost" onClick={() => go("/records")}>
                         Voir le dossier
                       </Button>
                     </div>

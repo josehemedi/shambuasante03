@@ -20,6 +20,7 @@ import { PageHeader } from "@/components/PageHeader"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, Badge, Button } from "@/components/ui/primitives"
 import { useI18n } from "@/i18n/I18nProvider"
 import { useAuth } from "@/auth/AuthProvider"
+import { useRolePath } from "@/hooks/useRolePath"
 import { useAsync } from "@/hooks/useAsync"
 import { tenantSubscriptionService } from "@/services/api"
 import SubscriptionPaymentModal from "@/components/SubscriptionPaymentModal"
@@ -475,6 +476,7 @@ export default function MySubscription() {
 /** Bannière réutilisable sur le dashboard admin hôpital */
 export function SubscriptionAlertBanner({ subscription, onRepay, paying }) {
   const { t } = useI18n()
+  const { path } = useRolePath()
   if (!subscription?.needsPayment) return null
 
   return (
@@ -493,7 +495,7 @@ export function SubscriptionAlertBanner({ subscription, onRepay, paying }) {
             {paying ? t("mySubscription.processing") : t("mySubscription.repayNow")}
           </Button>
           <Link
-            to="/my-subscription"
+            to={path("/my-subscription")}
             className="inline-flex h-8 items-center justify-center gap-1.5 rounded-xl border border-border bg-card px-3 text-xs font-medium text-foreground transition-all hover:bg-muted"
           >
             {t("mySubscription.viewDetails")}

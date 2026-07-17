@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react"
-import { useNavigate } from "react-router-dom"
+import { useRolePath } from "@/hooks/useRolePath"
 import { motion } from "framer-motion"
 import {
   Search,
@@ -422,21 +422,22 @@ export default function Patients() {
   const { user, roleKey } = useAuth()
   const isReception = roleKey === ROLE_KEYS.RECEPTIONIST
   const isDoctor = roleKey === ROLE_KEYS.DOCTOR
-  const navigate = useNavigate()
+  const { go } = useRolePath()
   const [query, setQuery] = useState("")
   const [activeFilter, setActiveFilter] = useState("all")
   const [clinicalFilter, setClinicalFilter] = useState("all")
-  const [creatorFilter, setCreatorFilter] = useState("all")
+  const [creatorFilter, setCreatorFilter] = useState(isReception ? "all" : "all")
   const [viewMode, setViewMode] = useState(isDoctor ? "grid" : "table")
   const { data: patients, loading, reload } = useAsync(
     () => {
       if (user?.idHopital == null) return Promise.resolve([])
       return patientService.listAccessible(user.idHopital, {
         roleKey,
-        mine: creatorFilter === "mine",
+        // Médecin : toujours patients attribués. Réception : filtre "mine" optionnel.
+        mine: isDoctor ? true : creatorFilter === "mine",
       })
     },
-    [user?.idHopital, roleKey, creatorFilter],
+    [user?.idHopital, roleKey, creatorFilter, isDoctor],
   )
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -484,9 +485,9 @@ export default function Patients() {
     query.trim() !== "" ||
     activeFilter !== "all" ||
     clinicalFilter !== "all" ||
-    ((isReception || isDoctor) && creatorFilter !== "all")
+    (isReception && creatorFilter !== "all")
 
-  const openPatient = (p) => navigate(`/patients/${p._backendId ?? p.idPatient}`)
+  const openPatient = (p) => go(`/patients/${p._backendId ?? p.idPatient}`)
 
   const handleViewReport = async (p) => {
     const patientId = p._backendId ?? p.idPatient
@@ -510,7 +511,7 @@ export default function Patients() {
     setListReportLoading(true)
     try {
       await patientService.downloadListReportPdf({
-        mine: creatorFilter === "mine",
+        mine: isDoctor ? true : creatorFilter === "mine",
       })
     } catch {
       await MySwal.fire({
@@ -599,7 +600,7 @@ export default function Patients() {
       ]
       if (isReception || isDoctor) {
         filterParts.push(
-          t(`patients.filters.creator.${isDoctor && creatorFilter === "mine" ? "assigned" : creatorFilter}`),
+          t(`patients.filters.creator.${isDoctor ? "assigned" : creatorFilter}`),
         )
       }
       if (query.trim()) {
@@ -756,11 +757,13 @@ export default function Patients() {
         <CardHeader className="border-b border-border/60 pb-4">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <CardTitle>{t("patients.allPatients")}</CardTitle>
+              <CardTitle>{isDoctor ? t("patients.myAssignedPatients") : t("patients.allPatients")}</CardTitle>
               <CardDescription className="mt-1">
                 {loading
                   ? t("patients.loadingPatients")
-                  : t("patients.resultsCount", { count: filtered.length })}
+                  : isDoctor
+                    ? `${t("patients.assignedHint")} — ${t("patients.resultsCount", { count: filtered.length })}`
+                    : t("patients.resultsCount", { count: filtered.length })}
               </CardDescription>
             </div>
             <div className="flex items-center gap-1 rounded-xl border border-border bg-muted/40 p-1">
@@ -837,7 +840,7 @@ export default function Patients() {
               ))}
             </div>
 
-            {(isReception || isDoctor) && (
+            {isReception && (
               <div className="flex flex-wrap items-center gap-2">
                 {CREATOR_FILTERS.map((value) => (
                   <FilterChip
@@ -845,7 +848,7 @@ export default function Patients() {
                     active={creatorFilter === value}
                     onClick={() => setCreatorFilter(value)}
                   >
-                    {t(`patients.filters.creator.${isDoctor && value === "mine" ? "assigned" : value}`)}
+                    {t(`patients.filters.creator.${value}`)}
                   </FilterChip>
                 ))}
               </div>

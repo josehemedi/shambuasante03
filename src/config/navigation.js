@@ -19,13 +19,13 @@ import {
   TestTube,
   Microscope,
   FileBarChart,
-  MessageSquare,
   Pill as PillIcon,
   Banknote,
   Archive,
   Clock,
   Monitor,
   Calculator,
+  Database,
 } from "lucide-react"
 import { ROLE_KEYS } from "@/config/roles"
 import {
@@ -93,7 +93,6 @@ export const navSections = [
       { key: "billing", path: "/billing", icon: Receipt, labelKey: "nav.billing", roles: [ROLE_KEYS.HOSPITAL_ADMIN], planFeature: "BILLING" },
       { key: "tariffs", path: "/tariffs", icon: Calculator, labelKey: "nav.tariffs", roles: [ROLE_KEYS.HOSPITAL_ADMIN], planFeature: "BILLING" },
       { key: "mySubscription", path: "/my-subscription", icon: CreditCard, labelKey: "nav.mySubscription", roles: [ROLE_KEYS.HOSPITAL_ADMIN] },
-      { key: "messages", path: "/messages", icon: MessageSquare, labelKey: "nav.messages", roles: [ROLE_KEYS.PATIENT] },
     ],
   },
   {
@@ -109,6 +108,7 @@ export const navSections = [
     group: "intelligence",
     items: [
       { key: "ai", path: "/ai-assistant", icon: Sparkles, labelKey: "nav.ai", roles: [ROLE_KEYS.SUPER_ADMIN, ROLE_KEYS.HOSPITAL_ADMIN, ROLE_KEYS.DOCTOR], badge: "AI", planFeature: "AI_ASSISTANT" },
+      { key: "ragAdmin", path: "/rag-admin", icon: Database, labelKey: "nav.ragAdmin", roles: [ROLE_KEYS.SUPER_ADMIN, ROLE_KEYS.HOSPITAL_ADMIN], badge: "RAG", planFeature: "AI_ASSISTANT" },
     ],
   },
 ]

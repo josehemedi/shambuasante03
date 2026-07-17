@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { useNavigate } from "react-router-dom"
+import { useRolePath } from "@/hooks/useRolePath"
 import { motion, AnimatePresence } from "framer-motion"
 import {
   Archive,
@@ -27,6 +28,7 @@ import { useAsync } from "@/hooks/useAsync"
 import { archiveService } from "@/services/archiveService"
 import { ROLE_KEYS } from "@/config/roles"
 import { ArchivesExplorer } from "@/components/ArchivesExplorer"
+import ArchiveCompressPanel from "@/components/ArchiveCompressPanel"
 import { cn } from "@/lib/utils"
 
 const TABS = [
@@ -76,6 +78,7 @@ const KPI_STYLES = {
 
 export default function ArchivesDashboard() {
   const { t, lang } = useI18n()
+  const { go } = useRolePath()
   const navigate = useNavigate()
   const { roleKey } = useAuth()
   const { notifications, markRead } = useNotifications()
@@ -458,15 +461,23 @@ export default function ArchivesDashboard() {
                             </td>
                             <td className="px-3 py-3 text-right">
                               {row.id && (
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  className="h-8 gap-1 text-primary hover:bg-primary/10 hover:text-primary"
-                                  onClick={() => navigate(`/archives/${row.id}`)}
-                                >
-                                  <Eye className="h-4 w-4" />
-                                  <span className="hidden sm:inline">{t("archives.view")}</span>
-                                </Button>
+                                <div className="flex flex-wrap items-center justify-end gap-1">
+                                  <ArchiveCompressPanel
+                                    variant="modal"
+                                    archiveId={row.id}
+                                    patientName={row.nomPatient || row.nomDemandeur}
+                                    numeroDossier={row.numeroDossier}
+                                  />
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-8 gap-1 text-primary hover:bg-primary/10 hover:text-primary"
+                                    onClick={() => go(`/archives/${row.id}`)}
+                                  >
+                                    <Eye className="h-4 w-4" />
+                                    <span className="hidden sm:inline">{t("archives.view")}</span>
+                                  </Button>
+                                </div>
                               )}
                             </td>
                           </motion.tr>

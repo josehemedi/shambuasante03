@@ -12,13 +12,14 @@ import {
   Ruler,
   Printer,
   Loader2,
+  Pill,
 } from "lucide-react"
 import Swal from "sweetalert2"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Button, Badge, Avatar } from "@/components/ui/primitives"
 import { formatDate, formatDateTime, cn } from "@/lib/utils"
 import { useI18n } from "@/i18n/I18nProvider"
-import { patientPortalService, consultationService } from "@/services/api"
+import { patientPortalService, consultationService, ordonnanceService } from "@/services/api"
 import { useAuth } from "@/auth/AuthProvider"
 import { ROLE_KEYS } from "@/config/roles"
 
@@ -64,7 +65,8 @@ function displayDate(record) {
 
 function ModalHero({ record, t, locale }) {
   const isConsultation = record.kind === "consultation"
-  const Icon = isConsultation ? Stethoscope : ClipboardList
+  const isOrdonnance = record.kind === "ordonnance"
+  const Icon = isConsultation ? Stethoscope : isOrdonnance ? Pill : ClipboardList
   const doctor = displayDoctor(record)
 
   return (
@@ -73,23 +75,34 @@ function ModalHero({ record, t, locale }) {
         "relative -mx-6 -mt-2 mb-4 overflow-hidden px-6 py-5",
         isConsultation
           ? "bg-gradient-to-br from-primary/15 via-primary/5 to-transparent"
-          : "bg-gradient-to-br from-accent/15 via-accent/5 to-transparent",
+          : isOrdonnance
+            ? "bg-gradient-to-br from-blue-600/15 via-sky-500/5 to-transparent"
+            : "bg-gradient-to-br from-accent/15 via-accent/5 to-transparent",
       )}
     >
       <div className="flex items-start gap-4">
         <div
           className={cn(
             "rounded-2xl p-3",
-            isConsultation ? "bg-primary/20 text-primary" : "bg-accent/20 text-accent-foreground",
+            isConsultation
+              ? "bg-primary/20 text-primary"
+              : isOrdonnance
+                ? "bg-blue-700/15 text-blue-800"
+                : "bg-accent/20 text-accent-foreground",
           )}
         >
           <Icon className="h-6 w-6" />
         </div>
         <div className="min-w-0 flex-1">
-          <Badge variant={isConsultation ? "primary" : "secondary"} className="mb-2">
+          <Badge
+            variant={isConsultation ? "primary" : isOrdonnance ? "secondary" : "secondary"}
+            className="mb-2"
+          >
             {record.recordType}
           </Badge>
-          <p className="font-mono text-xs text-muted-foreground">{record.id}</p>
+          <p className="font-mono text-xs text-muted-foreground">
+            {record.numeroOrdonnance || record.id}
+          </p>
           <p className="mt-1 text-sm text-muted-foreground">
             {formatDateTime(displayDate(record), locale)}
           </p>
@@ -161,6 +174,58 @@ function AntecedentDetails({ record, t, locale }) {
   )
 }
 
+function OrdonnanceDetails({ record, t, locale }) {
+  const d = record.detail || {}
+  const lines = String(d.contenu || d.contenuOrdonnance || "")
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean)
+
+  return (
+    <div className="space-y-4">
+      <dl className="space-y-2">
+        <DetailRow
+          label={t("records.detail.date")}
+          value={formatDateTime(displayDate(record), locale)}
+          icon={Calendar}
+          alwaysShow
+        />
+        <DetailRow
+          label={t("records.detail.diagnostic")}
+          value={d.diagnostic}
+          icon={Activity}
+        />
+        <DetailRow
+          label={t("records.detail.status")}
+          alwaysShow
+        >
+          <Badge variant="success">{d.statut || record.statut || "ACTIVE"}</Badge>
+        </DetailRow>
+      </dl>
+      <div>
+        <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          Rp/
+        </p>
+        {lines.length === 0 ? (
+          <p className="text-sm text-muted-foreground">—</p>
+        ) : (
+          <ol className="space-y-2">
+            {lines.map((line, i) => (
+              <li key={i} className="flex gap-2 text-sm text-foreground">
+                <span className="font-semibold text-muted-foreground">{i + 1}.</span>
+                <span className="leading-relaxed">{line.replace(/^\d+[.)]\s*/, "")}</span>
+              </li>
+            ))}
+          </ol>
+        )}
+      </div>
+      {d.observations && (
+        <DetailRow label={t("records.detail.observations")} value={d.observations} icon={FileTextIcon} />
+      )}
+    </div>
+  )
+}
+
 function MockDetails({ record, t, locale }) {
   return (
     <dl className="space-y-2">
@@ -189,8 +254,27 @@ export default function RecordDetailModal({ record, onClose }) {
 
   const isPatient = roleKey === ROLE_KEYS.PATIENT
   const consultationId = record.kind === "consultation" ? extractConsultationId(record) : null
+  const ordonnanceId =
+    record.kind === "ordonnance"
+      ? Number(record.idOrdonnance ?? record.detail?.id ?? String(record.id || "").replace(/^ORD-/i, "")) || null
+      : null
 
   async function handlePrintPdf() {
+    if (record.kind === "ordonnance" && ordonnanceId) {
+      setPrinting(true)
+      try {
+        await ordonnanceService.openPdf(ordonnanceId)
+      } catch (err) {
+        await Swal.fire({
+          icon: "error",
+          title: t("common.error"),
+          text: err?.message || t("records.detail.printPdfError"),
+        })
+      } finally {
+        setPrinting(false)
+      }
+      return
+    }
     if (!consultationId) return
     setPrinting(true)
     try {
@@ -215,7 +299,9 @@ export default function RecordDetailModal({ record, onClose }) {
       ? t("records.detail.consultationTitle")
       : record.kind === "antecedent"
         ? t("records.detail.antecedentTitle")
-        : record.recordType
+        : record.kind === "ordonnance"
+          ? t("records.types.ordonnance")
+          : record.recordType
 
   return (
     <Dialog open={Boolean(record)} onOpenChange={(open) => !open && onClose()}>
@@ -233,13 +319,19 @@ export default function RecordDetailModal({ record, onClose }) {
           {record.kind === "antecedent" && (
             <AntecedentDetails record={record} t={t} locale={locale} />
           )}
-          {record.kind !== "consultation" && record.kind !== "antecedent" && (
-            <MockDetails record={record} t={t} locale={locale} />
+          {record.kind === "ordonnance" && (
+            <OrdonnanceDetails record={record} t={t} locale={locale} />
           )}
+          {record.kind !== "consultation" &&
+            record.kind !== "antecedent" &&
+            record.kind !== "ordonnance" && (
+              <MockDetails record={record} t={t} locale={locale} />
+            )}
         </div>
 
         <DialogFooter className="border-t border-border/60 pt-4">
-          {record.kind === "consultation" && consultationId && (
+          {((record.kind === "consultation" && consultationId) ||
+            (record.kind === "ordonnance" && ordonnanceId)) && (
             <Button
               variant="default"
               onClick={handlePrintPdf}

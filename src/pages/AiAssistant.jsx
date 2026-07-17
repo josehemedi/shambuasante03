@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from "react"
+import { useSearchParams } from "react-router-dom"
 import { motion, AnimatePresence } from "framer-motion"
 import {
   Sparkles,
@@ -31,8 +32,10 @@ import {
 import { useI18n } from "@/i18n/I18nProvider"
 import { useAuth } from "@/auth/AuthProvider"
 import { useTenantScope } from "@/hooks/useTenantScope"
+import { useRolePath } from "@/hooks/useRolePath"
 import { TenantScopeBar } from "@/components/TenantScopeBar"
-import { aiService } from "@/services/api"
+import { aiService, patientService } from "@/services/api"
+import { ROLE_KEYS } from "@/config/roles"
 import { cn } from "@/lib/utils"
 
 const INSIGHT_ICONS = { risk: AlertTriangle, trend: TrendingUp, diagnosis: Stethoscope, summary: FileText }
@@ -63,6 +66,11 @@ const CAPABILITY_ICONS = {
   drugInteraction: Pill,
   summarize: ClipboardList,
   protocols: BookOpen,
+  allergies: AlertTriangle,
+  compare_lab: Activity,
+  missing: FileText,
+  admin: Shield,
+  platform: Zap,
 }
 
 function SuggestionCard({ text, onClick, index }) {
@@ -151,6 +159,22 @@ function ChatMessage({ message, t, doctorInitials }) {
           </div>
         )}
 
+        {message.warnings?.length > 0 && (
+          <div className="w-full space-y-1 px-1">
+            {message.warnings.map((w) => (
+              <p key={w} className="flex items-start gap-1.5 text-[11px] text-amber-700">
+                <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
+                {w}
+              </p>
+            ))}
+          </div>
+        )}
+        {message.missingFields?.length > 0 && (
+          <p className="px-1 text-[11px] text-rose-600">
+            {t("ai.missingFields")}: {message.missingFields.join(", ")}
+          </p>
+        )}
+
         {message.confidence != null && (
           <div className="flex items-center gap-2 px-1">
             <span className="text-[10px] text-muted-foreground">{t("ai.confidenceLabel")}</span>
@@ -186,14 +210,32 @@ function ThinkingIndicator({ label }) {
   )
 }
 
+function localizePrompt(prompt, lang) {
+  if (typeof prompt === "string") return prompt
+  if (prompt && typeof prompt === "object") {
+    const localized = prompt[lang] || prompt.fr || prompt.en
+    if (typeof localized === "string") return localized
+  }
+  return ""
+}
+
 export default function AiAssistant() {
-  const { t } = useI18n()
-  const { user } = useAuth()
+  const { t, lang } = useI18n()
+  const { user, roleKey } = useAuth()
   const { hospitalName, hopitalId, hasTenant, scopedSubtitle } = useTenantScope()
+  const { go } = useRolePath()
+  const [searchParams] = useSearchParams()
   const scrollRef = useRef(null)
   const [thinking, setThinking] = useState(false)
   const [draft, setDraft] = useState("")
   const [aiOnline, setAiOnline] = useState(true)
+  const [patientId, setPatientId] = useState(searchParams.get("patientId") || "")
+  const [patients, setPatients] = useState([])
+  const [apiPrompts, setApiPrompts] = useState([])
+
+  const isDoctor = roleKey === ROLE_KEYS.DOCTOR
+  const isAdmin = roleKey === ROLE_KEYS.HOSPITAL_ADMIN
+  const isSuper = roleKey === ROLE_KEYS.SUPER_ADMIN
 
   const doctorName = user?.name || "Dr."
   const doctorInitials = useMemo(() => {
@@ -216,7 +258,44 @@ export default function AiAssistant() {
     })
   }, [initialGreeting])
 
-  const suggestions = [t("ai.suggest1"), t("ai.suggest2"), t("ai.suggest3"), t("ai.suggest4")]
+  useEffect(() => {
+    if (!isDoctor) return
+    let cancelled = false
+    patientService
+      .listAccessible(hopitalId, { roleKey })
+      .then((list) => {
+        if (!cancelled) setPatients(list || [])
+      })
+      .catch(() => {
+        if (!cancelled) setPatients([])
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [isDoctor, hopitalId, roleKey])
+
+  useEffect(() => {
+    let cancelled = false
+    aiService
+      .getSuggestedPrompts()
+      .then((list) => {
+        if (!cancelled && Array.isArray(list) && list.length) setApiPrompts(list)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const suggestions = useMemo(() => {
+    const fromApi = apiPrompts
+      .map((prompt) => localizePrompt(prompt, lang))
+      .filter(Boolean)
+    if (fromApi.length > 0) return fromApi
+    return [t("ai.suggest1"), t("ai.suggest2"), t("ai.suggest3"), t("ai.suggest4")]
+      .map((prompt) => localizePrompt(prompt, lang))
+      .filter(Boolean)
+  }, [apiPrompts, lang, t])
 
   const insights = [
     { id: 1, type: "risk", title: t("ai.insightRiskTitle"), desc: t("ai.insightRiskDesc"), tone: "destructive", metric: "3" },
@@ -224,12 +303,28 @@ export default function AiAssistant() {
     { id: 3, type: "diagnosis", title: t("ai.insightDxTitle"), desc: t("ai.insightDxDesc"), tone: "warning", metric: "2" },
   ]
 
-  const capabilities = [
-    { key: "diagnosis", label: t("ai.diagnosis") },
-    { key: "drugInteraction", label: t("ai.drugInteraction") },
-    { key: "summarize", label: t("ai.summarize") },
-    { key: "protocols", label: t("ai.protocols") },
-  ]
+  const capabilities = isDoctor
+    ? [
+        { key: "summarize", label: t("ai.summarize") },
+        { key: "allergies", label: t("ai.allergies") },
+        { key: "protocols", label: t("ai.protocols") },
+        { key: "compare_lab", label: t("ai.compareLab") },
+        { key: "missing", label: t("ai.missingInfo") },
+        { key: "drugInteraction", label: t("ai.drugInteraction") },
+      ]
+    : isAdmin
+      ? [
+          { key: "admin-docs", analysisType: "admin", label: t("ai.adminDocs") },
+          { key: "admin-usage", analysisType: "admin", label: t("ai.adminUsage") },
+          { key: "admin-quota", analysisType: "admin", label: t("ai.adminQuota") },
+          { key: "admin-errors", analysisType: "admin", label: t("ai.adminErrors") },
+        ]
+      : [
+          { key: "plat-status", analysisType: "platform", label: t("ai.platformStatus") },
+          { key: "plat-usage", analysisType: "platform", label: t("ai.platformUsage") },
+          { key: "plat-plans", analysisType: "platform", label: t("ai.platformPlans") },
+          { key: "plat-errors", analysisType: "platform", label: t("ai.platformErrors") },
+        ]
 
   useEffect(() => {
     let cancelled = false
@@ -267,6 +362,7 @@ export default function AiAssistant() {
         message: question,
         analysisType,
         history,
+        patientId: isDoctor && patientId ? patientId : undefined,
       })
       setMessages((m) => [
         ...m,
@@ -282,6 +378,8 @@ export default function AiAssistant() {
                 hopitalId != null ? `#T-${hopitalId}` : t("tenant.saasBadge"),
               ],
           confidence: res.confidence ?? 88,
+          warnings: res.warnings,
+          missingFields: res.missingFields,
         },
       ])
       setAiOnline(true)
@@ -348,17 +446,18 @@ export default function AiAssistant() {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:max-w-xl">
-            {capabilities.map(({ key, label }) => {
-              const Icon = CAPABILITY_ICONS[key]
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:max-w-xl lg:grid-cols-3">
+            {capabilities.map(({ key, label, analysisType }) => {
+              const Icon = CAPABILITY_ICONS[analysisType || key] || Sparkles
+              const type = analysisType || key
               return (
                   <div
                     key={key}
                     role="button"
                     tabIndex={0}
-                    onClick={() => ask(label, key)}
+                    onClick={() => ask(label, type)}
                     onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") ask(label, key)
+                      if (e.key === "Enter" || e.key === " ") ask(label, type)
                     }}
                     className="rounded-xl border border-white/15 bg-white/10 px-3 py-2.5 backdrop-blur-sm transition hover:bg-white/20 cursor-pointer"
                   >
@@ -372,6 +471,46 @@ export default function AiAssistant() {
       </motion.section>
 
       <TenantScopeBar />
+
+      {isDoctor && (
+        <Card className="border-primary/15">
+          <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center">
+            <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+              <UserRound className="h-4 w-4 text-primary" />
+              {t("ai.selectPatient")}
+            </div>
+            <select
+              className="h-10 w-full rounded-xl border border-border bg-background px-3 text-sm sm:max-w-md"
+              value={patientId}
+              onChange={(e) => setPatientId(e.target.value)}
+            >
+              <option value="">{t("ai.noPatient")}</option>
+              {patients.map((p) => (
+                <option key={p.idPatient || p._backendId} value={p.idPatient || p._backendId}>
+                  {p.name || `${p.prenom || ""} ${p.nom || ""}`.trim() || p.codePatient || `#${p.idPatient}`}
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-muted-foreground">{t("ai.patientRagHint")}</p>
+          </CardContent>
+        </Card>
+      )}
+
+      {(isAdmin || isSuper) && (
+        <Card className="border-amber-200/70 bg-amber-50/40">
+          <CardContent className="flex flex-wrap items-center justify-between gap-3 p-4 text-sm text-amber-900">
+            <span>{isSuper ? t("ai.superRagHint") : t("ai.adminRagHint")}</span>
+            <Button
+              size="sm"
+              variant="outline"
+              className="border-amber-300 bg-white"
+              onClick={() => go("/rag-admin")}
+            >
+              {t("nav.ragAdmin")}
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-12">
         <div className="xl:col-span-8">
@@ -425,7 +564,7 @@ export default function AiAssistant() {
                 </p>
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                   {suggestions.map((s, index) => (
-                    <SuggestionCard key={s} text={s} index={index} onClick={() => ask(s)} />
+                    <SuggestionCard key={`suggest-${index}`} text={s} index={index} onClick={() => ask(s)} />
                   ))}
                 </div>
               </div>
@@ -469,8 +608,8 @@ export default function AiAssistant() {
             </CardHeader>
             <CardContent className="space-y-3 p-4">
               {insights.map((ins, index) => {
-                const Icon = INSIGHT_ICONS[ins.type]
-                const accent = INSIGHT_ACCENTS[ins.tone]
+                const Icon = INSIGHT_ICONS[ins.type] || Activity
+                const accent = INSIGHT_ACCENTS[ins.tone] || INSIGHT_ACCENTS.warning
                 return (
                   <motion.div
                     key={ins.id}
@@ -511,16 +650,17 @@ export default function AiAssistant() {
               <CardDescription>{t("ai.capabilitiesSubtitle")}</CardDescription>
             </CardHeader>
             <CardContent className="grid grid-cols-1 gap-2 p-4 sm:grid-cols-2 xl:grid-cols-1">
-              {capabilities.map(({ key, label }) => {
-                const Icon = CAPABILITY_ICONS[key]
+              {capabilities.map(({ key, label, analysisType }) => {
+                const Icon = CAPABILITY_ICONS[analysisType || key] || Sparkles
+                const type = analysisType || key
                 return (
                   <div
                     key={key}
                     role="button"
                     tabIndex={0}
-                    onClick={() => ask(label, key)}
+                    onClick={() => ask(label, type)}
                     onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") ask(label, key)
+                      if (e.key === "Enter" || e.key === " ") ask(label, type)
                     }}
                     className="flex items-center gap-3 rounded-xl border border-border/60 bg-muted/20 px-3 py-2.5 cursor-pointer transition hover:border-primary/30 hover:bg-primary/5"
                   >

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { useNavigate } from "react-router-dom"
+import { useRolePath } from "@/hooks/useRolePath"
 import { motion } from "framer-motion"
 import {
   Beaker,
@@ -103,7 +103,7 @@ function resolvePatientId(req) {
 export default function TestRequests() {
   const { t, lang, locale } = useI18n()
   const { roleKey, user } = useAuth()
-  const navigate = useNavigate()
+  const { go } = useRolePath()
   const isLabTech = roleKey === ROLE_KEYS.LAB_TECH
   const isDoctor = roleKey === ROLE_KEYS.DOCTOR
   const [requests, setRequests] = useState([])
@@ -263,7 +263,7 @@ export default function TestRequests() {
               Actualiser
             </Button>
             {isLabTech ? (
-              <Button variant="secondary" onClick={() => navigate("/lab-results")}>
+              <Button variant="secondary" onClick={() => go("/lab-results")}>
                 <FlaskConical className="h-4 w-4" />
                 Saisir un résultat
               </Button>
@@ -468,7 +468,8 @@ export default function TestRequests() {
                         {isDoctor && (
                           <Button
                             size="sm"
-                            className="gap-1.5 bg-teal-800 text-white hover:bg-teal-700"
+                            variant="outline"
+                            className="gap-1.5"
                             onClick={() => openPrescription(req)}
                           >
                             <Pill className="h-3.5 w-3.5" />
@@ -476,7 +477,7 @@ export default function TestRequests() {
                           </Button>
                         )}
                         {isLabTech && req.status !== "Completed" && (
-                          <Button size="sm" variant="secondary" onClick={() => navigate("/lab-results")}>
+                          <Button size="sm" variant="secondary" onClick={() => go("/lab-results")}>
                             Remplir
                           </Button>
                         )}

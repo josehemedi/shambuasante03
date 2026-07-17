@@ -69,7 +69,7 @@ export default function NewConsultationModal({ isOpen, onClose, onSave, loading 
     let active = true
     setPatientsLoading(true)
     patientService
-      .listAccessible(user.idHopital, { roleKey })
+      .listAccessible(user.idHopital, { roleKey, mine: true })
       .then((list) => {
         if (active) {
           setPatients(list || [])
@@ -143,12 +143,18 @@ export default function NewConsultationModal({ isOpen, onClose, onSave, loading 
                   disabled={loading || patientsLoading}
                 >
                   <SelectTrigger className="mt-1 w-full">
-                    <SelectValue placeholder={t("workspace.selectPatient")} />
+                    <SelectValue
+                      placeholder={
+                        patientsLoading
+                          ? t("common.loading")
+                          : t("workspace.selectPatient")
+                      }
+                    />
                   </SelectTrigger>
                   <SelectContent>
                     {patients.length === 0 && !patientsLoading ? (
                       <SelectItem value="__empty__" disabled>
-                        {t("workspace.noPatientsInHospital")}
+                        {t("appointments.noAssignedPatients")}
                       </SelectItem>
                     ) : (
                       patients.map((p) => (
@@ -159,6 +165,9 @@ export default function NewConsultationModal({ isOpen, onClose, onSave, loading 
                     )}
                   </SelectContent>
                 </Select>
+                <p className="mt-1.5 text-xs text-muted-foreground">
+                  {t("appointments.assignedPatientsOnly")}
+                </p>
               </div>
 
               <div>

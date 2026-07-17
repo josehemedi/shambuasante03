@@ -87,6 +87,57 @@ export const archiveService = {
     return response.blob()
   },
 
+  /**
+   * Compression / export multi-formats du dossier archivé.
+   * @param {number|string} archiveId
+   * @param {'ZIP'|'PDF_OPTIMIZED'|'PNG'|'TIFF'} format
+   * @param {{ download?: boolean }} [options] download=false pour obtenir le blob sans télécharger
+   */
+  exportDossier: async (archiveId, format, options = {}) => {
+    const { download = true } = options
+    const headers = new Headers()
+    applyTenantHeaders(headers)
+    const response = await fetch(
+      `${API_BASE_URL}/archives/${archiveId}/export?format=${encodeURIComponent(format)}`,
+      { headers },
+    )
+    if (!response.ok) {
+      let message = `HTTP ${response.status}`
+      try {
+        const payload = await response.json()
+        message = payload.message || payload.error || message
+      } catch {
+        // ignore
+      }
+      throw new Error(message)
+    }
+    const blob = await response.blob()
+    const disposition = response.headers.get("Content-Disposition") || ""
+    const match = /filename="?([^"]+)"?/i.exec(disposition)
+    const filename =
+      match?.[1] ||
+      `archive_${archiveId}_${String(format).toLowerCase()}.${
+        format === "ZIP" ? "zip" : format === "TIFF" ? "tiff" : format === "PNG" ? "png" : "pdf"
+      }`
+    if (download) {
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = filename
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+    }
+    return {
+      filename,
+      size: Number(response.headers.get("X-Export-Size") || blob.size || 0),
+      pages: Number(response.headers.get("X-Export-Pages") || 0),
+      format: response.headers.get("X-Export-Format") || format,
+      blob,
+    }
+  },
+
   verifier: (payload) => liveApiOnly(() => http.post("/archives/verifier", payload)),
 
   enregistrer: (payload) => liveApiOnly(() => http.post("/archives/enregistrer", payload)),

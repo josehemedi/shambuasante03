@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { useNavigate } from "react-router-dom"
+import { useRolePath } from "@/hooks/useRolePath"
 import { motion } from "framer-motion"
 import {
   CalendarDays,
@@ -154,7 +154,7 @@ function buildQueueChart(queue, t) {
 export default function ReceptionistDashboard() {
   const { t } = useI18n()
   const { user } = useAuth()
-  const navigate = useNavigate()
+  const { go } = useRolePath()
 
   const { data: kpis, reload: reloadKpis, loading: kpisLoading, error: kpisError } = useAsync(
     () => receptionService.getKpis(),
@@ -339,7 +339,7 @@ export default function ReceptionistDashboard() {
       })
 
       if (isTele && created?.urlVisio) {
-        navigate("/appointments")
+        go("/appointments")
       }
     } finally {
       setSaving(false)
@@ -367,8 +367,8 @@ export default function ReceptionistDashboard() {
     }
   }
 
-  const openAppointments = () => navigate("/appointments")
-  const openPatients = () => navigate("/patients")
+  const openAppointments = () => go("/appointments")
+  const openPatients = () => go("/patients")
 
   return (
     <motion.div

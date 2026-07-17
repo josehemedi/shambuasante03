@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react"
-import { useNavigate } from "react-router-dom"
+import { useRolePath } from "@/hooks/useRolePath"
 import {
   Users,
   Wallet,
@@ -143,7 +143,7 @@ function buildStatusChart(queue, t) {
 export default function CashierDashboard() {
   const { t, lang } = useI18n()
   const { user } = useAuth()
-  const navigate = useNavigate()
+  const { go } = useRolePath()
   const [reportLoading, setReportLoading] = useState(false)
 
   const { data: workspace, loading, error } = useAsync(
@@ -187,7 +187,7 @@ export default function CashierDashboard() {
     }
   }
 
-  const openDesk = () => navigate("/cashier")
+  const openDesk = () => go("/cashier")
 
   return (
     <div className="space-y-6">

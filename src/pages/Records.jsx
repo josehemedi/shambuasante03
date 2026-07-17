@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react"
+import { useMemo, useState, useEffect, useRef } from "react"
 import { Link } from "react-router-dom"
 import { motion } from "framer-motion"
 import {
@@ -23,6 +23,7 @@ import {
   FileCheck2,
   LayoutGrid,
   List,
+  Pill,
 } from "lucide-react"
 import Swal from "sweetalert2"
 import withReactContent from "sweetalert2-react-content"
@@ -46,11 +47,13 @@ import { useAuth } from "@/auth/AuthProvider"
 import { ROLE_KEYS } from "@/config/roles"
 import { useAsync } from "@/hooks/useAsync"
 import { useRolePath } from "@/hooks/useRolePath"
+import { useNotifications } from "@/auth/NotificationProvider"
 import { patientPortalService, consultationService } from "@/services/api"
 import { cn, formatDate, formatDateTime } from "@/lib/utils"
 import { exportRecordsToExcel } from "@/lib/exportRecordsExcel"
 import { useTenantScope } from "@/hooks/useTenantScope"
 import { TenantScopeBar } from "@/components/TenantScopeBar"
+import PatientRecordsVault from "@/components/PatientRecordsVault"
 
 const MySwal = withReactContent(Swal)
 
@@ -223,6 +226,26 @@ function dossierToRecords(dossier, t) {
       icon: mapAntecedentIcon(a.type),
       detail: { ...a },
       isCritical: Boolean(a.critique),
+    })
+  }
+
+  for (const o of dossier.ordonnances || []) {
+    const numero = o.numeroOrdonnance || `ORD-${o.id}`
+    records.push({
+      id: `ORD-${o.id}`,
+      kind: "ordonnance",
+      patientName,
+      patientId,
+      recordType: t("records.types.ordonnance"),
+      date: o.date,
+      doctor: "—",
+      department: t("records.types.ordonnance"),
+      summary: o.diagnostic || o.contenu || numero,
+      icon: Pill,
+      detail: { ...o },
+      idOrdonnance: o.id,
+      numeroOrdonnance: numero,
+      statut: o.statut,
     })
   }
 
@@ -492,15 +515,27 @@ function RecordsSkeleton({ count = 4, list = false }) {
 export default function Records() {
   const { t, locale, lang } = useI18n()
   const { roleKey, user } = useAuth()
-  const { go } = useRolePath()
+  const { go, path } = useRolePath()
   const { scopedSubtitle, hasTenant, hospitalName } = useTenantScope()
   const isPatient = roleKey === ROLE_KEYS.PATIENT
   const isDoctor = roleKey === ROLE_KEYS.DOCTOR
 
-  const { data: dossier, loading: patientLoading, error: patientError } = useAsync(
+  const { data: dossier, loading: patientLoading, error: patientError, reload: reloadDossier } = useAsync(
     () => (isPatient ? patientPortalService.getDossier() : Promise.resolve(null)),
     [isPatient],
+    isPatient ? { pollInterval: 12_000 } : { pollInterval: false },
   )
+
+  const { notifications } = useNotifications()
+  const lastOrdonnanceNotifId = useRef(null)
+
+  useEffect(() => {
+    if (!isPatient) return
+    const latest = (notifications || []).find((n) => n.type === "ORDONNANCE_ENVOYEE")
+    if (!latest || latest.id === lastOrdonnanceNotifId.current) return
+    lastOrdonnanceNotifId.current = latest.id
+    reloadDossier()
+  }, [isPatient, notifications, reloadDossier])
 
   const { data: medecinConsultations, loading: doctorLoading, error: doctorError } = useAsync(
     () => (isDoctor ? consultationService.getMedecinHistorique() : Promise.resolve([])),
@@ -696,6 +731,24 @@ export default function Records() {
     return t("records.emptyPatient")
   }
 
+  if (isPatient) {
+    return (
+      <PatientRecordsVault
+        t={t}
+        locale={locale}
+        user={user}
+        dossier={dossier}
+        loading={loading}
+        error={error}
+        records={sourceRecords}
+        patientDisplayName={patientDisplayName}
+        onDownloadPdf={handleOpenDossierPdf}
+        pdfLoading={pdfLoading}
+        pdfError={pdfError}
+      />
+    )
+  }
+
   return (
     <div className="space-y-6">
       {isDoctor ? (
@@ -738,7 +791,7 @@ export default function Records() {
               </div>
 
               <div className="flex flex-wrap items-center gap-2">
-                <Link to="/doctor-workspace">
+                <Link to={path("/doctor-workspace")}>
                   <Button
                     variant="outline"
                     size="sm"
@@ -958,7 +1011,7 @@ export default function Records() {
             )}
           </div>
           {isDoctor && (
-            <Link to="/doctor-workspace">
+            <Link to={path("/doctor-workspace")}>
               <Button variant="outline" className="gap-2">
                 <Stethoscope className="h-4 w-4" />
                 {t("docDash.openWorkspace")}

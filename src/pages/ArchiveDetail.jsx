@@ -1,5 +1,6 @@
 import { useRef, useState } from "react"
-import { useNavigate, useParams } from "react-router-dom"
+import { useParams } from "react-router-dom"
+import { useRolePath } from "@/hooks/useRolePath"
 import { motion, AnimatePresence } from "framer-motion"
 import {
   ArrowLeft,
@@ -26,6 +27,7 @@ import { archiveService } from "@/services/archiveService"
 import { ROLE_KEYS } from "@/config/roles"
 import { cn } from "@/lib/utils"
 import Swal from "sweetalert2"
+import ArchiveCompressPanel from "@/components/ArchiveCompressPanel"
 
 const DETAIL_TABS = [
   { id: "resume", icon: ClipboardList },
@@ -52,7 +54,7 @@ const ACTION_VARIANT = {
 
 export default function ArchiveDetail() {
   const { id } = useParams()
-  const navigate = useNavigate()
+  const { go } = useRolePath()
   const { t } = useI18n()
   const { roleKey } = useAuth()
   const [activeTab, setActiveTab] = useState("resume")
@@ -203,7 +205,7 @@ export default function ArchiveDetail() {
           variant="outline"
           size="sm"
           className="h-9 w-9 shrink-0 rounded-xl border-border/80 bg-card p-0 shadow-sm"
-          onClick={() => navigate("/archives")}
+          onClick={() => go("/archives")}
         >
           <ArrowLeft className="h-4 w-4" />
         </Button>
@@ -240,6 +242,12 @@ export default function ArchiveDetail() {
                   PDF
                 </Badge>
               )}
+              <ArchiveCompressPanel
+                variant="modal"
+                archiveId={archive.id}
+                patientName={archive.nomPatient || patient.nomComplet}
+                numeroDossier={archive.numeroDossier}
+              />
             </div>
           </div>
         </div>
@@ -488,6 +496,12 @@ export default function ArchiveDetail() {
           )}
 
           {activeTab === "fichiers" && (
+            <div className="space-y-4">
+              <ArchiveCompressPanel
+                archiveId={archive.id}
+                patientName={archive.nomPatient || patient.nomComplet}
+                numeroDossier={archive.numeroDossier}
+              />
             <Card className="space-y-4 overflow-hidden border-border/70 shadow-sm">
               <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/60 bg-gradient-to-r from-rose-500/[0.06] via-card to-transparent px-5 py-4">
                 <div>
@@ -650,6 +664,7 @@ export default function ArchiveDetail() {
                 )}
               </div>
             </Card>
+            </div>
           )}
 
           {activeTab === "historique" && (

@@ -31,6 +31,7 @@ import {
 } from "@/components/ui/primitives"
 import { useI18n } from "@/i18n/I18nProvider"
 import { useAuth } from "@/auth/AuthProvider"
+import { useRolePath } from "@/hooks/useRolePath"
 import { useAsync } from "@/hooks/useAsync"
 import { consultationService, workspaceService } from "@/services/api"
 import { useTenantScope } from "@/hooks/useTenantScope"
@@ -69,7 +70,6 @@ const QUICK_LINKS = [
   { to: "/appointments", icon: CalendarDays, labelKey: "nav.appointments", tone: "primary" },
   { to: "/teleconsultation", icon: Video, labelKey: "nav.teleconsultation", tone: "secondary" },
   { to: "/records", icon: FileHeart, labelKey: "nav.records", tone: "accent" },
-  { to: "/messages", icon: MessageSquare, labelKey: "nav.messages", tone: "primary" },
   { to: "/test-requests", icon: FlaskConical, labelKey: "nav.testRequests", tone: "warning" },
 ]
 
@@ -129,6 +129,7 @@ function formatTodayDate(locale) {
 export default function DoctorWorkspace() {
   const { t, locale } = useI18n()
   const { user } = useAuth()
+  const { path } = useRolePath()
   const { scopedSubtitle, hasTenant } = useTenantScope()
   const [searchParams, setSearchParams] = useSearchParams()
   const consultationIdParam = searchParams.get("consultation")
@@ -254,7 +255,7 @@ export default function DoctorWorkspace() {
   const resolveActivityStyle = (type) => ACTIVITY_STYLES[type] || ACTIVITY_STYLES.default
 
   const resolveApptLink = (appt) =>
-    appt.canal === "TELECONSULTATION" ? `/teleconsultation?rdv=${appt.id}` : null
+    appt.canal === "TELECONSULTATION" ? path(`/teleconsultation?rdv=${appt.id}`) : null
 
   const handleAgendaClick = (appt) => {
     if ((appt.canal || "").toUpperCase() === "TELECONSULTATION") {
@@ -322,7 +323,7 @@ export default function DoctorWorkspace() {
               )}
               {t("workspace.refreshData")}
             </Button>
-            <Link to="/teleconsultation">
+            <Link to={path("/teleconsultation")}>
               <Button
                 variant="outline"
                 size="sm"
@@ -485,7 +486,7 @@ export default function DoctorWorkspace() {
               {QUICK_LINKS.map(({ to, icon: Icon, labelKey, tone }) => (
                 <Link
                   key={to}
-                  to={to}
+                  to={path(to)}
                   className="group flex items-center gap-3 rounded-xl border border-border/70 bg-card p-3 transition-all hover:border-primary/30 hover:bg-muted/40 hover:shadow-sm"
                 >
                   <span

@@ -37,12 +37,28 @@ export function roleHomePath(roleKey) {
  * Préfixe un chemin module avec le rôle courant.
  * withRolePath("doctor", "/patients") → "/medecin/patients"
  * withRolePath("hospital_admin", "/") → "/admin"
+ * Conserve ?query et #hash : "/teleconsultation?rdv=1" → "/medecin/teleconsultation?rdv=1"
  */
 export function withRolePath(roleKey, modulePath = "/") {
   const base = roleHomePath(roleKey)
   if (!modulePath || modulePath === "/") return base
-  const normalized = modulePath.startsWith("/") ? modulePath : `/${modulePath}`
-  return `${base}${normalized}`
+  const raw = String(modulePath)
+  const hashIdx = raw.indexOf("#")
+  const queryIdx = raw.indexOf("?")
+  let pathOnly = raw
+  let suffix = ""
+  if (hashIdx >= 0) {
+    suffix = raw.slice(hashIdx)
+    pathOnly = raw.slice(0, hashIdx)
+  }
+  if (queryIdx >= 0 && (hashIdx < 0 || queryIdx < hashIdx)) {
+    const qEnd = hashIdx >= 0 ? hashIdx : raw.length
+    suffix = raw.slice(queryIdx, qEnd) + suffix
+    pathOnly = raw.slice(0, queryIdx)
+  }
+  const normalized = pathOnly.startsWith("/") ? pathOnly : `/${pathOnly}`
+  if (!normalized || normalized === "/") return `${base}${suffix}`
+  return `${base}${normalized}${suffix}`
 }
 
 /** Retire le préfixe de rôle éventuel : /admin/patients → /patients */

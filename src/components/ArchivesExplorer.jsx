@@ -1,10 +1,8 @@
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useId, useMemo, useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import {
   ChevronDown,
   ChevronRight,
-  FileStack,
-  FileText,
   FolderPlus,
   HardDrive,
   LayoutGrid,
@@ -17,6 +15,7 @@ import {
   Trash2,
   ArrowUp,
   Download,
+  FolderOpen,
 } from "lucide-react"
 import Swal from "sweetalert2"
 import withReactContent from "sweetalert2-react-content"
@@ -61,16 +60,173 @@ function WinFolderIcon({ open = false, className }) {
   )
 }
 
-/** Icône fichier dossier médical. */
-function WinFileIcon({ className }) {
+/** Dossier compressé Windows 11 / Fluent (zipfldr) — dossier jaune + fermeture éclair. */
+function WinZipIcon({ className }) {
+  const uid = useId().replace(/:/g, "")
+  const gBody = `win11ZipBody-${uid}`
+  const gFace = `win11ZipFace-${uid}`
+  const gMetal = `win11ZipMetal-${uid}`
+  const fShadow = `win11ZipShadow-${uid}`
+
   return (
-    <svg viewBox="0 0 48 48" className={cn("shrink-0 drop-shadow-sm", className)} aria-hidden>
-      <path fill="#E8F1FB" d="M10 4h18l10 10v28a2 2 0 0 1-2 2H10a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" />
-      <path fill="#B8D4F0" d="M28 4v10h10" />
-      <path fill="#3B82F6" d="M14 24h20v2.5H14zm0 6h16v2.5H14zm0 6h12v2.5H14z" opacity="0.85" />
-      <circle cx="16" cy="16" r="3" fill="#0EA5E9" />
+    <svg viewBox="0 0 64 64" className={cn("shrink-0", className)} aria-hidden>
+      <defs>
+        <linearGradient id={gBody} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#FFE08A" />
+          <stop offset="45%" stopColor="#F6C344" />
+          <stop offset="100%" stopColor="#E8A820" />
+        </linearGradient>
+        <linearGradient id={gFace} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#FFF3C4" />
+          <stop offset="100%" stopColor="#F7D56A" />
+        </linearGradient>
+        <linearGradient id={gMetal} x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stopColor="#F8FAFC" />
+          <stop offset="50%" stopColor="#CBD5E1" />
+          <stop offset="100%" stopColor="#94A3B8" />
+        </linearGradient>
+        <filter id={fShadow} x="-12%" y="-8%" width="124%" height="124%">
+          <feDropShadow dx="0" dy="1.5" stdDeviation="1.2" floodColor="#0f172a" floodOpacity="0.22" />
+        </filter>
+      </defs>
+
+      <g filter={`url(#${fShadow})`}>
+        <path
+          fill={`url(#${gBody})`}
+          d="M8 16c0-2.2 1.8-4 4-4h14.2l3.6 3.6H52c2.2 0 4 1.8 4 4v30c0 2.8-2.2 5-5 5H13c-2.8 0-5-2.2-5-5V16z"
+        />
+        <path
+          fill={`url(#${gFace})`}
+          d="M11 24h42v22.5c0 1.4-1.1 2.5-2.5 2.5h-37c-1.4 0-2.5-1.1-2.5-2.5V24z"
+        />
+        <path fill="#FFF8DC" opacity="0.45" d="M11 24h42v4.5H11z" />
+      </g>
+
+      <rect x="29.2" y="12" width="5.6" height="36" rx="1.2" fill="#D4A017" opacity="0.55" />
+
+      {[14, 18, 22, 26, 30, 34, 38, 42].map((y, i) => (
+        <rect
+          key={`z-${y}`}
+          x={i % 2 === 0 ? 28.2 : 31.6}
+          y={y}
+          width="4.2"
+          height="2.6"
+          rx="0.5"
+          fill={`url(#${gMetal})`}
+          stroke="#64748B"
+          strokeWidth="0.35"
+        />
+      ))}
+
+      <path
+        fill="#64748B"
+        stroke="#475569"
+        strokeWidth="0.4"
+        d="M28.5 46.5h7v4.2c0 1.1-.9 2-2 2h-3c-1.1 0-2-.9-2-2v-4.2z"
+      />
+      <rect x="29.6" y="47.2" width="4.8" height="2.2" rx="0.4" fill="#E2E8F0" />
+      <circle cx="32" cy="51.2" r="0.85" fill="#CBD5E1" />
+
+      <rect x="40" y="48" width="14" height="8" rx="1.5" fill="#1E293B" />
+      <text
+        x="47"
+        y="54.2"
+        textAnchor="middle"
+        fill="#F8FAFC"
+        fontSize="5.2"
+        fontWeight="700"
+        fontFamily="Segoe UI, system-ui, sans-serif"
+      >
+        ZIP
+      </text>
     </svg>
   )
+}
+
+/** Document PDF style Windows / Acrobat. */
+function WinPdfIcon({ className }) {
+  return (
+    <svg viewBox="0 0 48 48" className={cn("shrink-0 drop-shadow-sm", className)} aria-hidden>
+      <path fill="#F3F4F6" d="M10 4h18l10 10v28a2 2 0 0 1-2 2H10a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" />
+      <path fill="#D1D5DB" d="M28 4v10h10" />
+      <path fill="#DC2626" d="M8 28h32v12a2 2 0 0 1-2 2H10a2 2 0 0 1-2-2V28z" />
+      <text x="24" y="38" textAnchor="middle" fill="#fff" fontSize="9" fontWeight="700" fontFamily="Segoe UI, Arial, sans-serif">
+        PDF
+      </text>
+      <path fill="#9CA3AF" d="M14 16h14v2H14zm0 5h10v2H14z" opacity="0.7" />
+    </svg>
+  )
+}
+
+/** Image PNG / photo. */
+function WinImageIcon({ className, tint = "#0EA5E9" }) {
+  return (
+    <svg viewBox="0 0 48 48" className={cn("shrink-0 drop-shadow-sm", className)} aria-hidden>
+      <path fill="#F8FAFC" d="M10 4h18l10 10v28a2 2 0 0 1-2 2H10a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" />
+      <path fill="#CBD5E1" d="M28 4v10h10" />
+      <rect x="12" y="20" width="24" height="18" rx="1.5" fill={tint} opacity="0.2" />
+      <path fill={tint} d="M12 34l7-8 5 6 4-4 8 6v2a1.5 1.5 0 0 1-1.5 1.5H13.5A1.5 1.5 0 0 1 12 36v-2z" />
+      <circle cx="18" cy="25" r="2.5" fill={tint} />
+    </svg>
+  )
+}
+
+/** Document Word / générique. */
+function WinDocIcon({ className, label = "DOC", color = "#2563EB" }) {
+  return (
+    <svg viewBox="0 0 48 48" className={cn("shrink-0 drop-shadow-sm", className)} aria-hidden>
+      <path fill="#EFF6FF" d="M10 4h18l10 10v28a2 2 0 0 1-2 2H10a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" />
+      <path fill="#BFDBFE" d="M28 4v10h10" />
+      <path fill={color} d="M8 28h32v12a2 2 0 0 1-2 2H10a2 2 0 0 1-2-2V28z" />
+      <text x="24" y="38" textAnchor="middle" fill="#fff" fontSize="8" fontWeight="700" fontFamily="Segoe UI, Arial, sans-serif">
+        {label}
+      </text>
+      <path fill="#93C5FD" d="M14 16h16v2H14zm0 5h12v2H14z" />
+    </svg>
+  )
+}
+
+function formatBytes(n) {
+  if (n == null || Number.isNaN(Number(n))) return "—"
+  const v = Number(n)
+  if (v < 1024) return `${v} o`
+  if (v < 1024 * 1024) return `${(v / 1024).toFixed(1)} Ko`
+  return `${(v / (1024 * 1024)).toFixed(2)} Mo`
+}
+
+function resolveFileKind(fichier) {
+  const mime = String(fichier?.mimeType || "").toLowerCase()
+  const name = String(fichier?.nomFichier || "").toLowerCase()
+  const type = String(fichier?.typeFichier || "").toUpperCase()
+  if (mime.includes("zip") || name.endsWith(".zip") || mime.includes("x-zip") || mime.includes("compressed")) {
+    return { kind: "zip", label: "ZIP", typeKey: "zip", ext: ".zip" }
+  }
+  if (mime.includes("pdf") || name.endsWith(".pdf") || type === "DOSSIER_PATIENT" || type.startsWith("ORDONNANCE_") || type.startsWith("CONSULTATION_") || type.startsWith("BULLETIN_")) {
+    return { kind: "pdf", label: "PDF", typeKey: "pdf", ext: ".pdf" }
+  }
+  if (mime.includes("png") || name.endsWith(".png")) {
+    return { kind: "png", label: "PNG", typeKey: "png", ext: ".png" }
+  }
+  if (mime.includes("tiff") || name.endsWith(".tif") || name.endsWith(".tiff")) {
+    return { kind: "tiff", label: "TIFF", typeKey: "tiff", ext: ".tiff" }
+  }
+  if (mime.includes("image") || /\.(jpe?g|gif|webp)$/i.test(name)) {
+    return { kind: "image", label: "IMG", typeKey: "image", ext: "" }
+  }
+  if (mime.includes("word") || /\.(docx?)$/i.test(name)) {
+    return { kind: "doc", label: "DOC", typeKey: "doc", ext: ".doc" }
+  }
+  return { kind: "file", label: "FILE", typeKey: "file", ext: "" }
+}
+
+function DocTypeIcon({ kind, className }) {
+  if (kind === "zip") return <WinZipIcon className={className} />
+  if (kind === "pdf") return <WinPdfIcon className={className} />
+  if (kind === "png") return <WinImageIcon className={className} tint="#06B6D4" />
+  if (kind === "tiff") return <WinImageIcon className={className} tint="#059669" />
+  if (kind === "image") return <WinImageIcon className={className} tint="#0EA5E9" />
+  if (kind === "doc") return <WinDocIcon className={className} label="DOC" color="#2563EB" />
+  return <WinDocIcon className={className} label="FILE" color="#64748B" />
 }
 
 /**
@@ -86,11 +242,14 @@ export function ArchivesExplorer({ canManage = false }) {
   const [error, setError] = useState(null)
   const [selectedArchiveId, setSelectedArchiveId] = useState(null)
   const [selectedFolderId, setSelectedFolderId] = useState(null)
+  const [selectedDocId, setSelectedDocId] = useState(null)
+  const [browsingArchive, setBrowsingArchive] = useState(null)
   const [draggingArchiveId, setDraggingArchiveId] = useState(null)
   const [dropTargetId, setDropTargetId] = useState(undefined)
   const [viewMode, setViewMode] = useState("icons") // icons | details
   const [search, setSearch] = useState("")
   const [expanded, setExpanded] = useState(() => new Set())
+  const [packaging, setPackaging] = useState(false)
 
   const load = useCallback(
     async (id = folderId, { soft = false } = {}) => {
@@ -103,6 +262,11 @@ export function ArchivesExplorer({ canManage = false }) {
         ])
         setContent(explorer)
         setTree(arbre || [])
+        setBrowsingArchive((current) => {
+          if (!current?.id) return current
+          const refreshed = (explorer?.files || []).find((f) => f.id === current.id)
+          return refreshed ? { ...current, ...refreshed, fichiers: refreshed.fichiers || current.fichiers } : current
+        })
       } catch (err) {
         if (err?.silent || err?.status === 403) {
           setError(null)
@@ -144,6 +308,8 @@ export function ArchivesExplorer({ canManage = false }) {
   }, [folderId, load])
 
   const openFolder = (id) => {
+    setBrowsingArchive(null)
+    setSelectedDocId(null)
     setSelectedArchiveId(null)
     setSelectedFolderId(null)
     setFolderId(id ?? null)
@@ -153,12 +319,38 @@ export function ArchivesExplorer({ canManage = false }) {
   }
 
   const goUp = () => {
+    if (browsingArchive) {
+      setBrowsingArchive(null)
+      setSelectedDocId(null)
+      return
+    }
     const crumbs = content?.breadcrumb || []
     if (crumbs.length < 2) {
       openFolder(null)
       return
     }
     openFolder(crumbs[crumbs.length - 2]?.id ?? null)
+  }
+
+  const openArchiveFolder = async (file) => {
+    if (!file?.id) return
+    setSelectedArchiveId(file.id)
+    setSelectedFolderId(null)
+    setSelectedDocId(null)
+    setBrowsingArchive(file)
+    try {
+      const [detail, fichiers] = await Promise.all([
+        archiveService.getById(file.id).catch(() => null),
+        archiveService.listFichiers(file.id).catch(() => null),
+      ])
+      const merged = {
+        ...(detail || file),
+        fichiers: Array.isArray(fichiers) ? fichiers : detail?.fichiers || file.fichiers || [],
+      }
+      setBrowsingArchive(merged)
+    } catch {
+      // keep provisional folder view
+    }
   }
 
   const promptName = async (title, initial = "") => {
@@ -301,12 +493,28 @@ export function ArchivesExplorer({ canManage = false }) {
         f.nomPatient?.toLowerCase().includes(q) ||
         f.numeroDossier?.toLowerCase().includes(q) ||
         f.typeEpisode?.toLowerCase().includes(q) ||
-        f.statutArchive?.toLowerCase().includes(q),
+        f.statutArchive?.toLowerCase().includes(q) ||
+        f.nomPdf?.toLowerCase().includes(q),
     )
   }, [content?.files, search])
 
-  const itemCount = filteredFolders.length + filteredFiles.length
+  const archiveDocuments = useMemo(() => {
+    const list = browsingArchive?.fichiers || []
+    const q = search.trim().toLowerCase()
+    if (!q) return list
+    return list.filter(
+      (f) =>
+        f.nomFichier?.toLowerCase().includes(q) ||
+        f.typeFichier?.toLowerCase().includes(q) ||
+        f.mimeType?.toLowerCase().includes(q),
+    )
+  }, [browsingArchive, search])
+
+  const itemCount = browsingArchive
+    ? archiveDocuments.length
+    : filteredFolders.length + filteredFiles.length
   const selectedFile = filteredFiles.find((f) => f.id === selectedArchiveId)
+  const selectedDoc = archiveDocuments.find((f) => f.id === selectedDocId)
 
   const pickPrimaryFichier = (file) => {
     const list = file?.fichiers || []
@@ -325,29 +533,18 @@ export function ArchivesExplorer({ canManage = false }) {
     )
   }
 
-  const openArchivePdf = async (file) => {
-    if (!file?.id) return
-    const fichier = pickPrimaryFichier(file)
-    if (!fichier?.id) {
-      go(`/archives/${file.id}`)
-      return
-    }
+  const openDocument = async (archiveId, fichier) => {
+    if (!archiveId || !fichier?.id) return
     try {
-      const blob = await archiveService.downloadFichierBlob(file.id, fichier.id)
+      const blob = await archiveService.downloadFichierBlob(archiveId, fichier.id)
       const url = URL.createObjectURL(blob)
-      const isPdf =
-        String(fichier.mimeType || "").includes("pdf") ||
-        String(fichier.nomFichier || "").toLowerCase().endsWith(".pdf") ||
-        fichier.typeFichier === "DOSSIER_PATIENT" ||
-        String(fichier.typeFichier || "").startsWith("ORDONNANCE_") ||
-        String(fichier.typeFichier || "").startsWith("CONSULTATION_") ||
-        String(fichier.typeFichier || "").startsWith("BULLETIN_")
-      if (isPdf) {
+      const meta = resolveFileKind(fichier)
+      if (meta.kind === "pdf" || meta.kind === "png" || meta.kind === "image") {
         window.open(url, "_blank", "noopener,noreferrer")
       } else {
         const a = document.createElement("a")
         a.href = url
-        a.download = fichier.nomFichier || "fichier"
+        a.download = fichier.nomFichier || "document"
         a.click()
       }
       setTimeout(() => URL.revokeObjectURL(url), 60_000)
@@ -361,9 +558,68 @@ export function ArchivesExplorer({ canManage = false }) {
     }
   }
 
-  const addressPath = (content?.breadcrumb || [{ id: null, nom: t("archives.explorer.root") }])
-    .map((c) => c.nom)
-    .join(" › ")
+  const openArchivePdf = async (file) => {
+    if (!file?.id) return
+    const fichier = pickPrimaryFichier(file)
+    if (!fichier?.id) {
+      go(`/archives/${file.id}`)
+      return
+    }
+    await openDocument(file.id, fichier)
+  }
+
+  /** Crée un ZIP/PNG/TIFF/PDF et l'enregistre dans le dossier (visible comme sous Windows). */
+  const createPackageInFolder = async (format = "ZIP") => {
+    if (!browsingArchive?.id || packaging) return
+    setPackaging(true)
+    try {
+      const exported = await archiveService.exportDossier(browsingArchive.id, format, { download: false })
+      const file = new File([exported.blob], exported.filename, {
+        type: exported.blob.type || "application/octet-stream",
+      })
+      await archiveService.uploadFichier(browsingArchive.id, file)
+      const fichiers = await archiveService.listFichiers(browsingArchive.id)
+      setBrowsingArchive((cur) => (cur ? { ...cur, fichiers: fichiers || [] } : cur))
+      await load(folderId, { soft: true })
+      await MySwal.fire({
+        icon: "success",
+        title: t("archives.explorer.packageSuccessTitle"),
+        text: t("archives.explorer.packageSuccessBody", {
+          filename: exported.filename,
+          size: formatBytes(exported.size),
+        }),
+        timer: 2200,
+        showConfirmButton: false,
+      })
+    } catch (err) {
+      if (err?.silent || err?.status === 403) return
+      await MySwal.fire({
+        icon: "error",
+        title: t("common.error"),
+        text: err?.message || t("archives.explorer.error"),
+      })
+    } finally {
+      setPackaging(false)
+    }
+  }
+
+  const breadcrumbItems = useMemo(() => {
+    const base = content?.breadcrumb || [{ id: null, nom: t("archives.explorer.root") }]
+    if (!browsingArchive) return base
+    return [
+      ...base,
+      {
+        id: `archive:${browsingArchive.id}`,
+        nom:
+          browsingArchive.nomPatient ||
+          browsingArchive.numeroDossier ||
+          t("archives.explorer.patientFolder"),
+        isArchive: true,
+      },
+    ]
+  }, [content?.breadcrumb, browsingArchive, t])
+
+  const addressPath = breadcrumbItems.map((c) => c.nom).join(" › ")
 
   const renderTreeNode = (node, depth = 0) => {
     const hasChildren = (node.children || []).length > 0
@@ -471,6 +727,44 @@ export function ArchivesExplorer({ canManage = false }) {
             {t("archives.explorer.newFolder")}
           </Button>
         )}
+        {browsingArchive && (
+          <>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 gap-1.5 border-amber-200 bg-amber-50 text-amber-900 shadow-sm"
+              disabled={packaging}
+              onClick={() => createPackageInFolder("ZIP")}
+            >
+              {packaging ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <WinZipIcon className="h-4 w-4" />
+              )}
+              {t("archives.explorer.createZip")}
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 gap-1.5 border-slate-200 bg-white text-slate-700 shadow-sm"
+              disabled={packaging}
+              onClick={() => createPackageInFolder("PNG")}
+            >
+              <WinImageIcon className="h-4 w-4" tint="#06B6D4" />
+              PNG
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 gap-1.5 border-slate-200 bg-white text-slate-700 shadow-sm"
+              disabled={packaging}
+              onClick={() => createPackageInFolder("TIFF")}
+            >
+              <WinImageIcon className="h-4 w-4" tint="#059669" />
+              TIFF
+            </Button>
+          </>
+        )}
         <div className="relative ml-auto w-full max-w-xs sm:w-56">
           <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
           <Input
@@ -489,13 +783,17 @@ export function ArchivesExplorer({ canManage = false }) {
         </span>
         <div className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto rounded-lg border border-slate-200 bg-[#f8fafc] px-2 py-1.5">
           <HardDrive className="mr-1 h-3.5 w-3.5 shrink-0 text-[#0b6bcb]" />
-          {(content?.breadcrumb || [{ id: null, nom: t("archives.explorer.root") }]).map(
-            (crumb, idx, arr) => (
+          {breadcrumbItems.map((crumb, idx, arr) => (
               <span key={`${crumb.id}-${idx}`} className="flex shrink-0 items-center">
                 {idx > 0 && <ChevronRight className="mx-0.5 h-3 w-3 text-slate-300" />}
                 <button
                   type="button"
-                  onClick={() => openFolder(crumb.id)}
+                  onClick={() => {
+                    if (crumb.isArchive) return
+                    setBrowsingArchive(null)
+                    setSelectedDocId(null)
+                    openFolder(crumb.id)
+                  }}
                   className={cn(
                     "rounded px-1.5 py-0.5 text-[13px] transition-colors hover:bg-[#cce4f7]",
                     idx === arr.length - 1
@@ -506,8 +804,7 @@ export function ArchivesExplorer({ canManage = false }) {
                   {crumb.nom}
                 </button>
               </span>
-            ),
-          )}
+            ))}
         </div>
       </div>
 
@@ -535,7 +832,7 @@ export function ArchivesExplorer({ canManage = false }) {
               onDragLeave={() => setDropTargetId((cur) => (cur === null ? undefined : cur))}
               onDrop={(e) => onDropOnFolder(e, null)}
             >
-              <FileStack className="h-4 w-4 text-[#0b6bcb]" />
+              <HardDrive className="h-4 w-4 text-[#0b6bcb]" />
               {t("archives.explorer.root")}
             </button>
           </div>
@@ -571,6 +868,55 @@ export function ArchivesExplorer({ canManage = false }) {
               </div>
             ) : error ? (
               <p className="p-6 text-sm text-destructive">{error}</p>
+            ) : browsingArchive ? (
+              archiveDocuments.length === 0 ? (
+                <div className="flex min-h-[280px] flex-col items-center justify-center gap-3 px-6 text-center">
+                  <WinZipIcon className="h-14 w-14 opacity-80" />
+                  <p className="font-display text-sm font-semibold text-slate-700">
+                    {t("archives.explorer.noDocuments")}
+                  </p>
+                  <p className="max-w-sm text-xs text-slate-500">{t("archives.explorer.noDocumentsHint")}</p>
+                  <div className="mt-1 flex flex-wrap justify-center gap-2">
+                    <Button
+                      size="sm"
+                      className="gap-1.5"
+                      disabled={packaging}
+                      onClick={() => createPackageInFolder("ZIP")}
+                    >
+                      {packaging ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <WinZipIcon className="h-4 w-4" />}
+                      {t("archives.explorer.createZip")}
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => go(`/archives/${browsingArchive.id}`)}>
+                      {t("archives.viewDossier")}
+                    </Button>
+                  </div>
+                </div>
+              ) : viewMode === "icons" ? (
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6 2xl:grid-cols-7">
+                  {archiveDocuments.map((doc) => {
+                    const meta = resolveFileKind(doc)
+                    return (
+                      <DocumentTile
+                        key={`d-${doc.id}`}
+                        doc={doc}
+                        meta={meta}
+                        selected={selectedDocId === doc.id}
+                        typeLabel={t(`archives.explorer.fileTypes.${meta.typeKey}`)}
+                        onSelect={() => setSelectedDocId(doc.id)}
+                        onOpen={() => openDocument(browsingArchive.id, doc)}
+                      />
+                    )
+                  })}
+                </div>
+              ) : (
+                <DocumentsTable
+                  documents={archiveDocuments}
+                  selectedDocId={selectedDocId}
+                  t={t}
+                  onSelect={(id) => setSelectedDocId(id)}
+                  onOpen={(doc) => openDocument(browsingArchive.id, doc)}
+                />
+              )
             ) : itemCount === 0 ? (
               <EmptyExplorer
                 t={t}
@@ -616,11 +962,12 @@ export function ArchivesExplorer({ canManage = false }) {
                       selected={selectedArchiveId === file.id}
                       canManage={canManage}
                       dragging={draggingArchiveId === file.id}
+                      docsCount={(file.fichiers || []).length}
                       onSelect={() => {
                         setSelectedArchiveId(file.id)
                         setSelectedFolderId(null)
                       }}
-                      onOpen={() => openArchivePdf(file)}
+                      onOpen={() => openArchiveFolder(file)}
                       onDragStart={(e) => {
                         setDraggingArchiveId(file.id)
                         e.dataTransfer.setData("text/archive-id", String(file.id))
@@ -629,6 +976,7 @@ export function ArchivesExplorer({ canManage = false }) {
                       onDragEnd={() => setDraggingArchiveId(null)}
                       statusLabel={file.statutArchive}
                       statusVariant={STATUT_VARIANT[file.statutArchive] || "outline"}
+                      t={t}
                     />
                   ))}
                 </AnimatePresence>
@@ -652,7 +1000,7 @@ export function ArchivesExplorer({ canManage = false }) {
                   setSelectedArchiveId(id)
                   setSelectedFolderId(null)
                 }}
-                onOpenFile={(file) => openArchivePdf(file)}
+                onOpenFile={(file) => openArchiveFolder(file)}
                 onRenameFolder={handleRenameFolder}
                 onDeleteFolder={handleDeleteFolder}
                 onMoveFile={pickMoveTarget}
@@ -665,20 +1013,56 @@ export function ArchivesExplorer({ canManage = false }) {
 
           {/* Panneau détail sélection + barre d'état */}
           <div className="border-t border-slate-200 bg-slate-50/90">
-            {selectedFile && (
+            {browsingArchive && selectedDoc && (
               <div className="flex flex-wrap items-center gap-3 border-b border-slate-200/80 px-4 py-2.5 text-sm">
-                <WinFileIcon className="h-8 w-8" />
+                <DocTypeIcon kind={resolveFileKind(selectedDoc).kind} className="h-10 w-10" />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-semibold text-slate-800">
+                    {selectedDoc.nomFichier || selectedDoc.typeFichier}
+                  </p>
+                  <p className="truncate text-xs text-slate-500">
+                    {t(`archives.explorer.fileTypes.${resolveFileKind(selectedDoc).typeKey}`)} ·{" "}
+                    {formatBytes(selectedDoc.tailleOctets)}
+                  </p>
+                </div>
+                <Button
+                  size="sm"
+                  className="h-8"
+                  onClick={() => openDocument(browsingArchive.id, selectedDoc)}
+                >
+                  <Download className="mr-1 h-3.5 w-3.5" />
+                  {resolveFileKind(selectedDoc).kind === "zip"
+                    ? t("archives.explorer.openZip")
+                    : t("archives.pdf.open")}
+                </Button>
+              </div>
+            )}
+            {!browsingArchive && selectedFile && (
+              <div className="flex flex-wrap items-center gap-3 border-b border-slate-200/80 px-4 py-2.5 text-sm">
+                <WinFolderIcon open className="h-8 w-8" />
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-semibold text-slate-800">
                     {selectedFile.nomPatient || selectedFile.numeroDossier}
                   </p>
                   <p className="truncate text-xs text-slate-500">
                     {selectedFile.numeroDossier} · {selectedFile.typeEpisode} ·{" "}
-                    {selectedFile.statutArchive}
+                    {selectedFile.statutArchive} ·{" "}
+                    {t("archives.explorer.docsCount", {
+                      count: (selectedFile.fichiers || []).length,
+                    })}
                   </p>
                 </div>
                 <Button
                   size="sm"
+                  className="h-8"
+                  onClick={() => openArchiveFolder(selectedFile)}
+                >
+                  <FolderOpen className="mr-1 h-3.5 w-3.5" />
+                  {t("archives.explorer.openFolder")}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
                   className="h-8"
                   onClick={() => go(`/archives/${selectedFile.id}`)}
                 >
@@ -705,11 +1089,13 @@ export function ArchivesExplorer({ canManage = false }) {
             )}
             <div className="flex items-center justify-between px-4 py-1.5 text-[11px] text-slate-500">
               <span>
-                {t("archives.explorer.statusCount", {
-                  count: itemCount,
-                  folders: filteredFolders.length,
-                  files: filteredFiles.length,
-                })}
+                {browsingArchive
+                  ? t("archives.explorer.statusDocs", { count: archiveDocuments.length })
+                  : t("archives.explorer.statusCount", {
+                      count: itemCount,
+                      folders: filteredFolders.length,
+                      files: filteredFiles.length,
+                    })}
               </span>
               <span className="truncate pl-4 opacity-70">{addressPath}</span>
             </div>
@@ -811,12 +1197,14 @@ function FileTile({
   selected,
   canManage,
   dragging,
+  docsCount = 0,
   onSelect,
   onOpen,
   onDragStart,
   onDragEnd,
   statusLabel,
   statusVariant,
+  t,
 }) {
   return (
     <motion.div
@@ -838,24 +1226,21 @@ function FileTile({
       )}
     >
       <div className="relative mx-auto h-14 w-14">
-        {file.hasPdf ? (
-          <FileText className="mx-auto h-14 w-14 text-red-600" strokeWidth={1.25} />
-        ) : (
-          <WinFileIcon className="mx-auto h-14 w-14" />
-        )}
-        {file.hasPdf && (
-          <span className="absolute -right-1 -top-1 rounded bg-red-600 px-1 text-[9px] font-bold text-white">
-            PDF
+        <WinFolderIcon open={selected} className="mx-auto h-14 w-14" />
+        {docsCount > 0 && (
+          <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-md bg-blue-700 px-1 text-[10px] font-bold text-white shadow-sm">
+            {docsCount}
           </span>
         )}
       </div>
       <p className="mt-2 line-clamp-2 text-[13px] font-medium leading-tight text-slate-800">
-        {file.hasPdf && file.nomPdf
-          ? file.nomPdf.replace(/\.pdf$/i, "")
-          : file.nomPatient || file.numeroDossier || `#${file.id}`}
+        {file.nomPatient || file.numeroDossier || `#${file.id}`}
       </p>
       <p className="mt-0.5 truncate font-mono text-[10px] text-slate-400">
-        {file.hasPdf ? (file.nomPdf || "dossier.pdf") : file.numeroDossier || `ID-${file.id}`}
+        {file.numeroDossier || `ID-${file.id}`}
+      </p>
+      <p className="mt-0.5 text-[10px] text-slate-500">
+        {t("archives.explorer.patientFolder")} · {t("archives.explorer.docsCount", { count: docsCount })}
       </p>
       <div className="mt-1.5 flex justify-center">
         <Badge variant={statusVariant} className="text-[9px]">
@@ -863,6 +1248,103 @@ function FileTile({
         </Badge>
       </div>
     </motion.div>
+  )
+}
+
+function DocumentTile({ doc, meta, selected, typeLabel, onSelect, onOpen }) {
+  const isZip = meta.kind === "zip"
+  return (
+    <motion.div
+      layout
+      initial={{ opacity: 0, scale: 0.96 }}
+      animate={{ opacity: 1, scale: 1 }}
+      className={cn(
+        "group cursor-default rounded-lg border px-1.5 pb-2.5 pt-2.5 text-center transition-all",
+        selected
+          ? "border-[#99c3e8] bg-[#cce8ff] shadow-[inset_0_0_0_1px_rgba(0,103,192,0.25)]"
+          : "border-transparent hover:bg-[#f5f5f5]",
+        isZip && "pt-1.5",
+      )}
+      onClick={onSelect}
+      onDoubleClick={onOpen}
+      title={`${doc.nomFichier || doc.typeFichier}\n${typeLabel}`}
+    >
+      <div
+        className={cn(
+          "mx-auto flex items-center justify-center",
+          isZip ? "h-[72px] w-[72px]" : "h-16 w-16",
+        )}
+      >
+        <DocTypeIcon
+          kind={meta.kind}
+          className={cn(
+            "transition-transform group-hover:scale-[1.03]",
+            isZip ? "h-[68px] w-[68px]" : "h-14 w-14",
+          )}
+        />
+      </div>
+      <p
+        className={cn(
+          "mt-1 line-clamp-2 px-0.5 leading-snug text-slate-800",
+          isZip ? "text-[12.5px] font-semibold" : "text-[12px] font-medium",
+        )}
+      >
+        {doc.nomFichier || doc.typeFichier || "document"}
+      </p>
+      <p className="mt-0.5 truncate px-1 text-[10px] text-slate-500">{typeLabel}</p>
+      <p className="mt-0.5 text-[10px] tabular-nums text-slate-400">{formatBytes(doc.tailleOctets)}</p>
+    </motion.div>
+  )
+}
+
+function DocumentsTable({ documents, selectedDocId, t, onSelect, onOpen }) {
+  return (
+    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+      <table className="w-full text-left text-[13px]">
+        <thead>
+          <tr className="border-b border-slate-200 bg-slate-50 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+            <th className="px-3 py-2.5">{t("archives.explorer.colName")}</th>
+            <th className="hidden px-3 py-2.5 sm:table-cell">{t("archives.explorer.colType")}</th>
+            <th className="hidden px-3 py-2.5 md:table-cell">{t("archives.explorer.colSize")}</th>
+            <th className="px-3 py-2.5 text-right">{t("archives.columns.actions")}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {documents.map((doc) => {
+            const meta = resolveFileKind(doc)
+            return (
+              <tr
+                key={`doc-${doc.id}`}
+                className={cn(
+                  "border-b border-slate-100 transition-colors",
+                  selectedDocId === doc.id ? "bg-[#d9ecfb]" : "hover:bg-slate-50",
+                )}
+                onClick={() => onSelect(doc.id)}
+                onDoubleClick={() => onOpen(doc)}
+              >
+                <td className="px-3 py-2">
+                  <div className="flex items-center gap-2.5">
+                    <DocTypeIcon kind={meta.kind} className="h-8 w-8" />
+                    <span className="font-medium text-slate-800">{doc.nomFichier || doc.typeFichier}</span>
+                  </div>
+                </td>
+                <td className="hidden px-3 py-2 text-slate-500 sm:table-cell">
+                  {t(`archives.explorer.fileTypes.${meta.typeKey}`)}
+                </td>
+                <td className="hidden px-3 py-2 tabular-nums text-slate-500 md:table-cell">
+                  {formatBytes(doc.tailleOctets)}
+                </td>
+                <td className="px-3 py-2 text-right">
+                  <Button size="sm" variant="ghost" className="h-7" onClick={() => onOpen(doc)}>
+                    <Download className="h-3.5 w-3.5" />
+                  </Button>
+                </td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+    </div>
   )
 }
 
@@ -946,65 +1428,70 @@ function DetailsTable({
               </td>
             </tr>
           ))}
-          {files.map((file) => (
-            <tr
-              key={`fl-${file.id}`}
-              draggable={canManage}
-              onDragStart={(e) => {
-                setDraggingArchiveId(file.id)
-                e.dataTransfer.setData("text/archive-id", String(file.id))
-              }}
-              onDragEnd={() => setDraggingArchiveId(null)}
-              className={cn(
-                "border-b border-slate-100 transition-colors",
-                selectedArchiveId === file.id ? "bg-[#d9ecfb]" : "hover:bg-slate-50",
-                draggingArchiveId === file.id && "opacity-50",
-              )}
-              onClick={() => onSelectFile(file.id)}
-              onDoubleClick={() => onOpenFile(file)}
-            >
-              <td className="px-3 py-2">
-                <div className="flex items-center gap-2">
-                  {file.hasPdf ? (
-                    <FileText className="h-5 w-5 text-red-600" />
-                  ) : (
-                    <WinFileIcon className="h-5 w-5" />
-                  )}
-                  <div className="min-w-0">
-                    <p className="truncate font-medium text-slate-800">
-                      {file.hasPdf && file.nomPdf
-                        ? file.nomPdf
-                        : file.nomPatient || file.numeroDossier}
-                    </p>
-                    <p className="truncate font-mono text-[10px] text-slate-400">
-                      {file.numeroDossier}
-                      {file.hasPdf ? " · PDF" : ""}
-                    </p>
+          {files.map((file) => {
+            const docsCount = Array.isArray(file.fichiers) ? file.fichiers.length : 0
+            return (
+              <tr
+                key={`fl-${file.id}`}
+                draggable={canManage}
+                onDragStart={(e) => {
+                  setDraggingArchiveId(file.id)
+                  e.dataTransfer.setData("text/archive-id", String(file.id))
+                }}
+                onDragEnd={() => setDraggingArchiveId(null)}
+                className={cn(
+                  "border-b border-slate-100 transition-colors",
+                  selectedArchiveId === file.id ? "bg-[#d9ecfb]" : "hover:bg-slate-50",
+                  draggingArchiveId === file.id && "opacity-50",
+                )}
+                onClick={() => onSelectFile(file.id)}
+                onDoubleClick={() => onOpenFile(file)}
+              >
+                <td className="px-3 py-2">
+                  <div className="flex items-center gap-2">
+                    <div className="relative shrink-0">
+                      <WinFolderIcon className="h-8 w-8" />
+                      {docsCount > 0 && (
+                        <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded bg-blue-700 px-0.5 text-[9px] font-bold text-white">
+                          {docsCount}
+                        </span>
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="truncate font-medium text-slate-800">
+                        {file.nomPatient || file.numeroDossier || `#${file.id}`}
+                      </p>
+                      <p className="truncate font-mono text-[10px] text-slate-400">
+                        {file.numeroDossier || `ID-${file.id}`} ·{" "}
+                        {t("archives.explorer.docsCount", { count: docsCount })}
+                      </p>
+                    </div>
                   </div>
-                </div>
-              </td>
-              <td className="hidden px-3 py-2 text-slate-500 sm:table-cell">
-                {file.typeEpisode || "—"}
-              </td>
-              <td className="hidden px-3 py-2 md:table-cell">
-                <Badge variant={STATUT_VARIANT[file.statutArchive] || "outline"} className="text-[10px]">
-                  {file.statutArchive}
-                </Badge>
-              </td>
-              <td className="px-3 py-2 text-right">
-                <div className="inline-flex gap-1">
-                  <Button size="sm" variant="outline" className="h-7" onClick={() => onOpenFile(file)}>
-                    {file.hasPdf ? t("archives.pdf.open") : t("archives.viewDossier")}
-                  </Button>
-                  {canManage && (
-                    <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => onMoveFile(file)}>
-                      <MoveRight className="h-3.5 w-3.5" />
+                </td>
+                <td className="hidden px-3 py-2 text-slate-500 sm:table-cell">
+                  {t("archives.explorer.patientFolder")}
+                </td>
+                <td className="hidden px-3 py-2 md:table-cell">
+                  <Badge variant={STATUT_VARIANT[file.statutArchive] || "outline"} className="text-[10px]">
+                    {file.statutArchive}
+                  </Badge>
+                </td>
+                <td className="px-3 py-2 text-right">
+                  <div className="inline-flex gap-1">
+                    <Button size="sm" variant="outline" className="h-7 gap-1" onClick={() => onOpenFile(file)}>
+                      <FolderOpen className="h-3.5 w-3.5" />
+                      {t("archives.explorer.openFolder")}
                     </Button>
-                  )}
-                </div>
-              </td>
-            </tr>
-          ))}
+                    {canManage && (
+                      <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => onMoveFile(file)}>
+                        <MoveRight className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
+                  </div>
+                </td>
+              </tr>
+            )
+          })}
         </tbody>
       </table>
     </div>

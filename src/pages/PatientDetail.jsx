@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react"
-import { useParams, useNavigate } from "react-router-dom"
+import { useParams } from "react-router-dom"
+import { useRolePath } from "@/hooks/useRolePath"
 import { motion } from "framer-motion"
 import Swal from "sweetalert2"
 import withReactContent from "sweetalert2-react-content"
@@ -41,7 +42,7 @@ const rdvStatusVariant = {
 
 export default function PatientDetail() {
   const { id } = useParams()
-  const navigate = useNavigate()
+  const { go } = useRolePath()
   const { t, lang } = useI18n()
   const { user, roleKey } = useAuth()
   const { data: patient, loading, error, reload } = useAsync(() => patientService.getDossier(id), [id])
@@ -63,7 +64,7 @@ export default function PatientDetail() {
     return (
       <div className="py-20 text-center">
         <p className="text-muted-foreground">{t("patients.detailNotFound")}</p>
-        <Button variant="outline" className="mt-4" onClick={() => navigate("/patients")}>
+        <Button variant="outline" className="mt-4" onClick={() => go("/patients")}>
           <ArrowLeft className="h-4 w-4" />
           {t("patients.backToList")}
         </Button>
@@ -97,7 +98,7 @@ export default function PatientDetail() {
   return (
     <div>
       <button
-        onClick={() => navigate("/patients")}
+        onClick={() => go("/patients")}
         className="mb-4 inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
       >
         <ArrowLeft className="h-4 w-4" />

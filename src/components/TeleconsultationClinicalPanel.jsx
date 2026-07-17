@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react"
 
-import { useNavigate } from "react-router-dom"
+import { useRolePath } from "@/hooks/useRolePath"
 
 import { FlaskConical, FileSignature, Loader2, Plus, Printer, Save, Stethoscope, Trash2 } from "lucide-react"
 
@@ -61,7 +61,7 @@ export default function TeleconsultationClinicalPanel({ idRdv, patientName, moti
 
   const { t } = useI18n()
 
-  const navigate = useNavigate()
+  const { go } = useRolePath()
 
   const [loading, setLoading] = useState(false)
 
@@ -307,7 +307,7 @@ export default function TeleconsultationClinicalPanel({ idRdv, patientName, moti
 
       if (result.isConfirmed) {
 
-        navigate("/records")
+        go("/records")
 
       }
 

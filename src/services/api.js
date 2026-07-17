@@ -269,12 +269,27 @@ function mapPatientAntecedent(a) {
   }
 }
 
+function mapPatientOrdonnance(o) {
+  return {
+    id: o.idOrdonnance ?? o.id,
+    numeroOrdonnance: o.numeroOrdonnance || null,
+    date: o.datePrescription || o.date || null,
+    diagnostic: o.diagnostic || "",
+    contenu: o.contenuOrdonnance || o.contenu || "",
+    observations: o.observations || "",
+    statut: o.statut || "ACTIVE",
+    idMedecin: o.idMedecin ?? null,
+    dateExpiration: o.dateExpiration || null,
+  }
+}
+
 function mapPatientDossier(data) {
   const p = data.patient || {}
   const base = mapPatient(p)
   const contact = parseContactUrgence(p.contactUrgence)
   const consultations = (data.consultations || []).map(mapPatientConsultation)
   const antecedents = (data.antecedents || []).map(mapPatientAntecedent)
+  const ordonnances = (data.ordonnances || []).map(mapPatientOrdonnance)
   const latest = consultations[0] || null
 
   return {
@@ -293,6 +308,7 @@ function mapPatientDossier(data) {
     rendezVous: (data.rendezVous || []).map(mapPatientRdv),
     consultations,
     antecedents,
+    ordonnances,
     vitals: latest
       ? {
           bp: latest.tension || "—",
@@ -861,12 +877,11 @@ export const patientService = {
       const list = await http.get(`/patients${qs}`)
       return filterPatientsByHopital((list || []).map(mapPatient), hopitalId)
     }),
-  /** Liste patients selon le rôle : médecin → tous les patients de l'établissement (filtre mine = attribués). */
+  /** Liste patients selon le rôle : médecin → uniquement patients attribués. */
   listAccessible: (hopitalId, { roleKey, mine } = {}) =>
     liveApiOnly(async () => {
       if (roleKey === ROLE_KEYS.DOCTOR) {
-        const qs = mine ? "?mine=true" : ""
-        const list = await http.get(`/medecins/patients${qs}`)
+        const list = await http.get("/medecins/patients?mine=true")
         return (list || []).map(mapPatient)
       }
       const qs = mine ? "?mine=true" : ""
@@ -1278,11 +1293,15 @@ function mapMedecinLabRequest(item) {
 export const ordonnanceService = {
   create: (payload) => liveApiOnly(() => http.post("/ordonnances", payload)),
   listByPatient: (idPatient) => liveApiOnly(() => http.get(`/ordonnances/patient/${idPatient}`)),
+  listMine: () => liveApiOnly(() => http.get("/ordonnances/medecin/me")),
   getById: (id) => liveApiOnly(() => http.get(`/ordonnances/${id}`)),
   openPdf: async (idOrdonnance) => {
     const blob = await fetchPdfBlob(`/ordonnances/${idOrdonnance}/pdf`)
     openPdfBlob(blob, `ordonnance_${idOrdonnance}.pdf`)
   },
+  /** Envoie l'ordonnance PDF au patient concerné (e-mail professionnel). */
+  sendToPatient: (idOrdonnance) =>
+    liveApiOnly(() => http.post(`/ordonnances/${idOrdonnance}/envoyer-patient`, {})),
 }
 
 export const medecinService = {
@@ -1572,11 +1591,6 @@ export const patientPortalService = {
       const data = await http.get("/v1/patients/me/dossier")
       return mapPatientDossier(data)
     }),
-  getMessageConversations: () =>
-    liveApiOnly(async () => {
-      const list = await http.get("/v1/patients/me/messages/conversations")
-      return (list || []).map(mapPatientMessageConversation)
-    }),
   downloadConsultationPdf: (idConsultation) =>
     liveApiOnly(async () => {
       const blob = await fetchPdfBlob(`/v1/patients/me/consultations/${idConsultation}/pdf`)
@@ -1732,8 +1746,38 @@ export const monitoringService = {
 }
 
 export const aiAnalyticsService = {
-  getKpis: () => mockResolve(aiAnalyticsKpis),
-  getModelUsageSeries: () => mockResolve(modelUsageSeries),
+  getKpis: () =>
+    withLiveApi(async () => {
+      try {
+        const rag = await http.get("/rag/analytics")
+        return {
+          ...aiAnalyticsKpis,
+          totalInferences: Number(rag.total_calls ?? rag.totalCalls ?? aiAnalyticsKpis.totalInferences) || 0,
+          errorRate: Number(rag.error_calls ?? rag.errorCalls ?? 0),
+          estimatedCost: Number(rag.total_cost_usd ?? rag.totalCostUsd ?? 0),
+          activeHospitals: Number(rag.hospitals_active ?? rag.hospitalsActive ?? 0),
+          model: rag.model,
+          scope: rag.scope,
+        }
+      } catch {
+        return aiAnalyticsKpis
+      }
+    }, aiAnalyticsKpis),
+  getModelUsageSeries: () =>
+    withLiveApi(async () => {
+      try {
+        const rag = await http.get("/rag/analytics")
+        const days = rag.usageByDay || []
+        if (!days.length) return modelUsageSeries
+        return days.map((d) => ({
+          date: d.day,
+          calls: Number(d.calls || 0),
+          cost: Number(d.cost_usd || d.costUsd || 0),
+        }))
+      } catch {
+        return modelUsageSeries
+      }
+    }, modelUsageSeries),
   getInferenceCostSeries: () => mockResolve(inferenceCostSeries),
   getAdoptionByTenant: () => mockResolve(adoptionByTenant),
   getQualityMetrics: () => mockResolve(qualityMetrics),
@@ -2036,21 +2080,6 @@ function mapPatientTeleSession(appointment) {
   }
 }
 
-function mapPatientMessageConversation(c) {
-  return {
-    idRdv: c.idRdv,
-    idHopital: c.idHopital ?? null,
-    doctorName: c.doctorName || "—",
-    motifVisite: c.motifVisite || "",
-    dateHeureRdv: c.dateHeureRdv,
-    statutRdv: c.statutRdv,
-    unreadCount: Number(c.unreadCount) || 0,
-    lastMessagePreview: c.lastMessagePreview || "",
-    lastMessageAt: c.lastMessageAt,
-    lastSenderRole: c.lastSenderRole,
-  }
-}
-
 function mapTeleChatMessage(msg) {
   return {
     id: msg.id,
@@ -2089,10 +2118,21 @@ export const teleService = {
           return (list || []).map(mapPatientTeleSession)
         }
       }
-      const list = await http.get("/rendezvous")
-      return (list || [])
+
+      // Médecin : RDV téléconsultation de CE médecin ∩ patients qui lui sont attribués
+      const [rdvs, assignedPatients] = await Promise.all([
+        http.get("/rendezvous/medecin/historique"),
+        http.get("/medecins/patients?mine=true"),
+      ])
+      const assignedIds = new Set(
+        (assignedPatients || [])
+          .map((p) => Number(p.idPatient ?? p._backendId ?? p.id))
+          .filter((id) => Number.isFinite(id)),
+      )
+      return (rdvs || [])
         .filter((rdv) => (rdv.canal || "").toUpperCase() === "TELECONSULTATION")
-        .filter((rdv) => !["ANNULE", "ABSENT"].includes((rdv.statutRdv || "").toUpperCase()))
+        .filter((rdv) => !["ANNULE", "ABSENT", "TERMINE", "TERMINÉ"].includes((rdv.statutRdv || "").toUpperCase()))
+        .filter((rdv) => assignedIds.has(Number(rdv.idPatient)))
         .map(mapTeleSession)
     }),
   getRendezVous: (idRendezVous) =>
@@ -2121,26 +2161,55 @@ export const aiService = {
   getStatus: () => liveApiOnly(() => http.get("/ai/status")),
   getSuggestedPrompts: () =>
     withLiveApi(() => http.get("/ai/prompts"), aiSuggestedPrompts),
-  sendMessage: ({ message, analysisType, history }) =>
+  sendMessage: ({ message, analysisType, history, patientId }) =>
     liveApiOnly(() =>
-      http.post("/ai/chat", { message, analysisType, history }).then((res) => ({
-        role: res.role || "assistant",
-        content: res.content || "",
-        model: res.model,
-        sources: res.sources || [],
-        confidence: res.confidence,
-      })),
+      http
+        .post("/ai/chat", {
+          message,
+          analysisType,
+          history,
+          patientId: patientId != null ? Number(patientId) : null,
+        })
+        .then((res) => ({
+          role: res.role || "assistant",
+          content: res.content || "",
+          model: res.model,
+          sources: res.sources || [],
+          confidence: res.confidence,
+          ragScope: res.ragScope,
+          warnings: res.warnings || [],
+          missingFields: res.missingFields || [],
+        })),
     ),
-  analyze: ({ message, analysisType, history }) =>
+  analyze: ({ message, analysisType, history, patientId }) =>
     liveApiOnly(() =>
-      http.post("/ai/analyze", { message, analysisType, history }).then((res) => ({
-        role: res.role || "assistant",
-        content: res.content || "",
-        model: res.model,
-        sources: res.sources || [],
-        confidence: res.confidence,
-      })),
+      http
+        .post("/ai/analyze", {
+          message,
+          analysisType,
+          history,
+          patientId: patientId != null ? Number(patientId) : null,
+        })
+        .then((res) => ({
+          role: res.role || "assistant",
+          content: res.content || "",
+          model: res.model,
+          sources: res.sources || [],
+          confidence: res.confidence,
+          ragScope: res.ragScope,
+          warnings: res.warnings || [],
+          missingFields: res.missingFields || [],
+        })),
     ),
+}
+
+export const ragService = {
+  listDocuments: () => liveApiOnly(() => http.get("/rag/documents")),
+  createDocument: (payload) => liveApiOnly(() => http.post("/rag/documents", payload)),
+  updateDocument: (id, payload) => liveApiOnly(() => http.put(`/rag/documents/${id}`, payload)),
+  deleteDocument: (id) => liveApiOnly(() => http.delete(`/rag/documents/${id}`)),
+  getAnalytics: () => liveApiOnly(() => http.get("/rag/analytics")),
+  getCategories: () => liveApiOnly(() => http.get("/rag/categories")),
 }
 
 // ——— Caissier (multi-tenant : données isolées par id_hopital JWT) ———
