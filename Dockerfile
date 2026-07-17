@@ -34,8 +34,8 @@ LABEL org.opencontainers.image.title="Shambua Santé UI" \
       org.opencontainers.image.description="Frontend React / Vite — production nginx" \
       org.opencontainers.image.vendor="Shambua Santé"
 
-# Backend joignable depuis le conteneur (service Docker ou host)
-ENV BACKEND_UPSTREAM=host.docker.internal:8082
+# Backend joignable depuis le conteneur (service Docker du stack Hospicloud)
+ENV BACKEND_UPSTREAM=backend:8082
 
 COPY docker/nginx.conf /etc/nginx/conf.d/default.conf
 COPY docker/nginx-upstream.conf.template /etc/nginx/templates/00-upstream.conf.template

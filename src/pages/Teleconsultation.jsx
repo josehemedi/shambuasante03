@@ -37,7 +37,20 @@ const ease = [0.22, 1, 0.36, 1]
 
 function normalizeTeleError(message, t) {
   if (!message) return null
-  const lower = String(message).toLowerCase()
+  const text = String(message)
+  const lower = text.toLowerCase()
+  if (
+    lower.includes("<!doctype") ||
+    lower.includes("<html") ||
+    lower.includes("bad gateway") ||
+    lower.includes("error code 502") ||
+    lower.includes("cloudflare") ||
+    lower.includes("cf-error") ||
+    lower.includes("temporairement indisponible") ||
+    lower.includes("502") && lower.includes("gateway")
+  ) {
+    return t("tele.gatewayError")
+  }
   if (
     lower.includes("invalid token") ||
     lower.includes("token expired") ||
@@ -56,7 +69,11 @@ function normalizeTeleError(message, t) {
   if (lower.includes("forbidden") || lower.includes("access denied") || lower.includes("access is denied")) {
     return t("tele.accessDenied")
   }
-  return message
+  // Évite d'afficher un pavé HTML/SQL brut
+  if (text.length > 280 || (text.includes("{") && text.includes("PreparedStatement"))) {
+    return t("tele.connectionError")
+  }
+  return text
 }
 
 function ControlButton({ active, danger, onClick, icon: Icon, label, disabled }) {

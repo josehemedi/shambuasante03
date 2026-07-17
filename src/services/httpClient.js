@@ -80,9 +80,17 @@ async function parseResponse(response) {
   }
 
   if (!response.ok) {
-    const rawMessage =
-      (payload && typeof payload === "object" && (payload.message || payload.error)) ||
+    let rawMessage =
+      (payload && typeof payload === "object" && (payload.message || payload.error || payload.detail)) ||
       (typeof payload === "string" && payload ? payload : null)
+
+    // Ne jamais afficher une page HTML (Cloudflare/nginx 502) à l'utilisateur
+    if (typeof rawMessage === "string" && looksLikeHtmlOrGatewayPage(rawMessage)) {
+      rawMessage = gatewayStatusMessage(response.status)
+    } else if ([502, 503, 504].includes(response.status) && (!rawMessage || looksLikeHtmlOrGatewayPage(String(rawMessage)))) {
+      rawMessage = gatewayStatusMessage(response.status)
+    }
+
     const code = payload && typeof payload === "object" ? (payload.code || payload.error) : undefined
 
     // Ne plus afficher les 403 « rôle / session » à l'utilisateur
@@ -106,13 +114,38 @@ async function parseResponse(response) {
               : `HTTP ${response.status}`),
     )
     error.status = response.status
-    error.payload = payload
+    error.payload = typeof payload === "string" && looksLikeHtmlOrGatewayPage(payload) ? null : payload
     error.code = code
     error.silent = Boolean(isAccessDenied403 || (response.status === 403 && !rawMessage))
     throw error
   }
 
   return payload
+}
+
+function looksLikeHtmlOrGatewayPage(text) {
+  const sample = String(text).slice(0, 800).toLowerCase()
+  return (
+    sample.includes("<!doctype html") ||
+    sample.includes("<html") ||
+    sample.includes("bad gateway") ||
+    sample.includes("error code 502") ||
+    sample.includes("cloudflare") ||
+    sample.includes("cf-error-details")
+  )
+}
+
+function gatewayStatusMessage(status) {
+  if (status === 502) {
+    return "Le serveur applicatif est temporairement indisponible (502). Réessayez dans quelques instants."
+  }
+  if (status === 503) {
+    return "Service temporairement indisponible (503). Réessayez dans quelques instants."
+  }
+  if (status === 504) {
+    return "Délai d'attente dépassé (504). Réessayez dans quelques instants."
+  }
+  return "Le serveur est temporairement inaccessible. Réessayez dans quelques instants."
 }
 
 export async function httpClient(path, options = {}) {

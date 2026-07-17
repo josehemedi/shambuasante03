@@ -2093,6 +2093,8 @@ export const translations = {
       remoteVideoLabel: "Interlocutor",
       localVideoLabel: "You",
       connectionError: "Unable to connect to the video session",
+      gatewayError:
+        "The hospital server is temporarily unreachable (bad gateway). Please retry in a moment. If it persists, the backend may be restarting.",
       livekitTokenError: "Video connection failed: LiveKit token invalid or expired. Check LiveKit API keys (LIVEKIT_API_KEY / LIVEKIT_API_SECRET) and restart the server.",
       selectSessionHint: "Select a session or open a link from your appointment email.",
       permissionError: "Camera and microphone access are required for teleconsultation.",
@@ -5204,6 +5206,8 @@ export const translations = {
       remoteVideoLabel: "Interlocuteur",
       localVideoLabel: "Vous",
       connectionError: "Impossible de se connecter à la visio",
+      gatewayError:
+        "Le serveur de l'hôpital est temporairement inaccessible (bad gateway). Réessayez dans un instant. Si le problème persiste, le backend est peut-être en redémarrage.",
       livekitTokenError: "Connexion vidéo impossible : token LiveKit invalide ou expiré. Vérifiez les clés LiveKit (LIVEKIT_API_KEY / LIVEKIT_API_SECRET) et redémarrez le serveur.",
       selectSessionHint: "Sélectionnez une séance ou ouvrez le lien reçu par email.",
       permissionError: "L'accès caméra et micro est requis pour la téléconsultation.",
