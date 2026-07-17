@@ -15,11 +15,75 @@ function attachVideoTrack(track, element) {
   try {
     track.attach(element)
     styleVideoElement(element)
+    element.muted = true
+    element.playsInline = true
     element.play().catch(() => {})
     return true
   } catch {
     return false
   }
+}
+
+/** Attache une piste audio distante et force la lecture (autoplay). */
+function attachRemoteAudioTrack(track, container) {
+  if (!track || track.kind !== Track.Kind.Audio) return false
+  try {
+    const elements = track.attach()
+    const list = Array.isArray(elements) ? elements : [elements]
+    list.forEach((el) => {
+      if (!el) return
+      el.autoplay = true
+      el.playsInline = true
+      el.setAttribute("playsinline", "true")
+      el.volume = 1
+      el.muted = false
+      if (container && !container.contains(el)) {
+        container.appendChild(el)
+      } else if (!el.parentElement) {
+        document.body.appendChild(el)
+      }
+      el.play().catch(() => {})
+    })
+    return list.length > 0
+  } catch (err) {
+    console.warn("[livekit] attach audio:", err)
+    return false
+  }
+}
+
+function detachMediaTrack(track) {
+  if (!track) return
+  try {
+    track.detach().forEach((el) => {
+      el.remove()
+    })
+  } catch {
+    try {
+      track.detach()
+    } catch {
+      /* ignore */
+    }
+  }
+}
+
+function collectRemoteTracks(room, kind) {
+  const tracks = []
+  room.remoteParticipants.forEach((participant) => {
+    participant.trackPublications.forEach((publication) => {
+      if (publication.track && publication.track.kind === kind) {
+        tracks.push(publication.track)
+      }
+    })
+  })
+  return tracks
+}
+
+function collectRemoteVideoTracks(room) {
+  return collectRemoteTracks(room, Track.Kind.Video)
+}
+
+function collectRemoteAudioTracks(room) {
+  return collectRemoteTracks(room, Track.Kind.Audio)
 }
 
 function isBrowserPermissionError(err) {
@@ -48,18 +112,6 @@ function describeMicError(err) {
   return "unknown"
 }
 
-function collectRemoteVideoTracks(room) {
-  const tracks = []
-  room.remoteParticipants.forEach((participant) => {
-    participant.trackPublications.forEach((publication) => {
-      if (publication.track && publication.track.kind === Track.Kind.Video) {
-        tracks.push(publication.track)
-      }
-    })
-  })
-  return tracks
-}
-
 async function requestCameraStream() {
   const unavailable = getMediaUnavailableReason()
   if (unavailable) {
@@ -85,6 +137,41 @@ async function requestCameraStream() {
   throw lastError || new Error("camera-unavailable")
 }
 
+/** Préflight utilisateur : caméra + micro dans le même geste (clic). */
+async function requestAvStream() {
+  const unavailable = getMediaUnavailableReason()
+  if (unavailable) {
+    const err = new Error(unavailable)
+    err.name = unavailable === "insecure-context" ? "SecurityError" : "NotSupportedError"
+    throw err
+  }
+
+  const attempts = [
+    {
+      video: { facingMode: "user" },
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+      },
+    },
+    { video: true, audio: true },
+    { video: { facingMode: "user" }, audio: false },
+    { video: true, audio: false },
+  ]
+
+  let lastError = null
+  for (const constraints of attempts) {
+    try {
+      return await navigator.mediaDevices.getUserMedia(constraints)
+    } catch (err) {
+      lastError = err
+    }
+  }
+
+  throw lastError || new Error("media-unavailable")
+}
+
 async function requestMicStream() {
   const unavailable = getMediaUnavailableReason()
   if (unavailable) {
@@ -92,12 +179,21 @@ async function requestMicStream() {
     err.name = unavailable === "insecure-context" ? "SecurityError" : "NotSupportedError"
     throw err
   }
-  return navigator.mediaDevices.getUserMedia({ audio: true, video: false })
+  return navigator.mediaDevices.getUserMedia({
+    audio: {
+      echoCancellation: true,
+      noiseSuppression: true,
+      autoGainControl: true,
+    },
+    video: false,
+  })
 }
 
 function showStreamPreview(stream, element) {
   if (!stream || !element) return false
   element.srcObject = stream
+  element.muted = true
+  element.playsInline = true
   styleVideoElement(element)
   element.play().catch(() => {})
   return true
@@ -241,34 +337,52 @@ export function useLiveKitRoom({ serverUrl, token, enabled, initialCameraStream 
     }
   }, [localVideoReady, camOn, syncLocalVideo, markCameraActive])
 
-  const syncRemoteVideo = useCallback((room) => {
-    const remoteTracks = collectRemoteVideoTracks(room)
-    setRemoteParticipantPresent(room.remoteParticipants.size > 0)
-
-    if (remoteTracks.length === 0) {
-      setRemoteConnected(false)
-      return
-    }
-
-    const attached = attachVideoTrack(remoteTracks[0], remoteVideoRef.current)
-    setRemoteConnected(attached)
+  const syncRemoteAudio = useCallback((room) => {
+    collectRemoteAudioTracks(room).forEach((track) => {
+      attachRemoteAudioTrack(track)
+    })
   }, [])
+
+  const syncRemoteMedia = useCallback(
+    (room) => {
+      const remoteTracks = collectRemoteVideoTracks(room)
+      setRemoteParticipantPresent(room.remoteParticipants.size > 0)
+      syncRemoteAudio(room)
+
+      if (remoteTracks.length === 0) {
+        setRemoteConnected(false)
+        return
+      }
+
+      const attached = attachVideoTrack(remoteTracks[0], remoteVideoRef.current)
+      setRemoteConnected(attached)
+    },
+    [syncRemoteAudio],
+  )
 
   const publishPreviewStream = useCallback(
     async (room, stream) => {
       const videoTrack = stream.getVideoTracks()[0]
-      if (!videoTrack) return false
+      const audioTrack = stream.getAudioTracks()[0]
+      if (!videoTrack && !audioTrack) return false
 
       previewStreamRef.current = stream
 
       try {
-        if (!room.localParticipant.getTrackPublication(Track.Source.Camera)) {
+        if (videoTrack && !room.localParticipant.getTrackPublication(Track.Source.Camera)) {
           await room.localParticipant.publishTrack(videoTrack, { source: Track.Source.Camera })
         }
-        return syncLocalVideo(room)
+        if (audioTrack && !room.localParticipant.getTrackPublication(Track.Source.Microphone)) {
+          await room.localParticipant.publishTrack(audioTrack, {
+            source: Track.Source.Microphone,
+          })
+          setMicOn(true)
+          setMicDenied(false)
+        }
+        return videoTrack ? syncLocalVideo(room) : Boolean(audioTrack)
       } catch (err) {
-        console.warn("[livekit] publication caméra:", err)
-        if (localVideoRef.current) {
+        console.warn("[livekit] publication média:", err)
+        if (videoTrack && localVideoRef.current) {
           showStreamPreview(stream, localVideoRef.current)
         }
         if (hasLiveCameraTrack(stream)) {
@@ -398,14 +512,8 @@ export function useLiveKitRoom({ serverUrl, token, enabled, initialCameraStream 
 
   const startLocalMedia = useCallback(async () => {
     const cameraOk = await enableCamera()
-    if (cameraOk) {
-      try {
-        await enableMicrophone()
-      } catch {
-        // micro optionnel
-      }
-    }
-    return cameraOk
+    const micOk = await enableMicrophone()
+    return cameraOk || micOk
   }, [enableCamera, enableMicrophone])
 
   const bootstrapLocalMedia = useCallback(async () => {
@@ -413,35 +521,48 @@ export function useLiveKitRoom({ serverUrl, token, enabled, initialCameraStream 
     if (!room || status !== "connected") return false
 
     const pending = initialCameraStreamRef.current || previewStreamRef.current
-    if (pending && hasLiveCameraTrack(pending)) {
+    if (pending && (hasLiveCameraTrack(pending) || pending.getAudioTracks?.()?.length)) {
       previewStreamRef.current = pending
-      if (localVideoRef.current) {
+      if (localVideoRef.current && hasLiveCameraTrack(pending)) {
         showStreamPreview(pending, localVideoRef.current)
       }
-      markCameraActive()
+      if (hasLiveCameraTrack(pending)) {
+        markCameraActive()
+      }
       await publishPreviewStream(room, pending)
       initialCameraStreamRef.current = null
-      try {
+      if (!room.localParticipant.isMicrophoneEnabled) {
         await enableMicrophone()
-      } catch {
-        // ignore
       }
       return true
     }
 
     return startLocalMedia()
-  }, [status, publishPreviewStream, markCameraActive, startLocalMedia])
+  }, [status, publishPreviewStream, markCameraActive, startLocalMedia, enableMicrophone])
 
   useEffect(() => {
     if (!enabled || !serverUrl || !token) {
       return undefined
     }
 
-    const room = new Room({ adaptiveStream: true, dynacast: true })
+    const room = new Room({
+      adaptiveStream: true,
+      dynacast: true,
+      audioCaptureDefaults: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+      },
+    })
     roomRef.current = room
     let cancelled = false
 
     const handleRemoteTrack = (track) => {
+      if (track.kind === Track.Kind.Audio) {
+        attachRemoteAudioTrack(track)
+        setRemoteParticipantPresent(true)
+        return
+      }
       if (track.kind !== Track.Kind.Video) return
       const attached = attachVideoTrack(track, remoteVideoRef.current)
       if (attached) {
@@ -451,23 +572,37 @@ export function useLiveKitRoom({ serverUrl, token, enabled, initialCameraStream 
     }
 
     room.on(RoomEvent.TrackSubscribed, (track) => handleRemoteTrack(track))
+    room.on(RoomEvent.TrackMuted, (publication) => {
+      if (publication.kind === Track.Kind.Audio && publication.track) {
+        attachRemoteAudioTrack(publication.track)
+      }
+    })
+    room.on(RoomEvent.TrackUnmuted, (publication) => {
+      if (publication.kind === Track.Kind.Audio && publication.track) {
+        attachRemoteAudioTrack(publication.track)
+      }
+    })
     room.on(RoomEvent.ParticipantConnected, () => {
       setRemoteParticipantPresent(room.remoteParticipants.size > 0)
-      syncRemoteVideo(room)
+      syncRemoteMedia(room)
     })
     room.on(RoomEvent.ParticipantDisconnected, () => {
       setRemoteParticipantPresent(room.remoteParticipants.size > 0)
-      syncRemoteVideo(room)
+      syncRemoteMedia(room)
     })
     room.on(RoomEvent.TrackUnsubscribed, (track) => {
-      if (track.kind === Track.Kind.Video) {
-        track.detach()
-        syncRemoteVideo(room)
+      if (track.kind === Track.Kind.Audio || track.kind === Track.Kind.Video) {
+        detachMediaTrack(track)
+        syncRemoteMedia(room)
       }
     })
     room.on(RoomEvent.LocalTrackPublished, (publication) => {
       if (publication.source === Track.Source.Camera) {
         syncLocalVideo(room)
+      }
+      if (publication.source === Track.Source.Microphone) {
+        setMicOn(true)
+        setMicDenied(false)
       }
     })
 
@@ -482,25 +617,52 @@ export function useLiveKitRoom({ serverUrl, token, enabled, initialCameraStream 
         if (cancelled) return
 
         setStatus("connected")
-        syncRemoteVideo(room)
+        syncRemoteMedia(room)
 
         const pending = initialCameraStreamRef.current || previewStreamRef.current
-        if (pending && hasLiveCameraTrack(pending)) {
+        if (pending && (hasLiveCameraTrack(pending) || pending.getAudioTracks?.()?.length)) {
           previewStreamRef.current = pending
-          if (localVideoRef.current) {
+          if (localVideoRef.current && hasLiveCameraTrack(pending)) {
             showStreamPreview(pending, localVideoRef.current)
           }
-          markCameraActive()
+          if (hasLiveCameraTrack(pending)) {
+            markCameraActive()
+          }
           await publishPreviewStream(room, pending)
           initialCameraStreamRef.current = null
-          if (isMediaDevicesAvailable()) {
-            try {
+        }
+
+        if (!cancelled && isMediaDevicesAvailable()) {
+          try {
+            if (!room.localParticipant.isMicrophoneEnabled) {
               await room.localParticipant.setMicrophoneEnabled(true)
-              setMicOn(true)
-            } catch {
-              // micro optionnel au démarrage
+            }
+            setMicOn(Boolean(room.localParticipant.isMicrophoneEnabled))
+            setMicDenied(false)
+          } catch (micErr) {
+            console.warn("[livekit] micro au démarrage:", micErr)
+            try {
+              const stream = await requestMicStream()
+              const audioTrack = stream.getAudioTracks()[0]
+              if (audioTrack && !room.localParticipant.getTrackPublication(Track.Source.Microphone)) {
+                await room.localParticipant.publishTrack(audioTrack, {
+                  source: Track.Source.Microphone,
+                })
+                setMicOn(true)
+                setMicDenied(false)
+              }
+            } catch (fallbackErr) {
+              if (describeMicError(fallbackErr) === "mic-permission") {
+                setMicDenied(true)
+                setMediaError("mic-permission")
+              }
+              setMicOn(false)
             }
           }
+        }
+
+        if (!cancelled) {
+          syncRemoteMedia(room)
         }
       } catch (err) {
         if (!cancelled) {
@@ -527,7 +689,7 @@ export function useLiveKitRoom({ serverUrl, token, enabled, initialCameraStream 
     enabled,
     serverUrl,
     token,
-    syncRemoteVideo,
+    syncRemoteMedia,
     syncLocalVideo,
     publishPreviewStream,
     markCameraActive,
@@ -625,11 +787,15 @@ export function useLiveKitRoom({ serverUrl, token, enabled, initialCameraStream 
   }
 }
 
-/** Demande la caméra pendant un clic utilisateur (avant les appels réseau). */
+/** Demande caméra + micro pendant un clic utilisateur (avant les appels réseau). */
 export async function primeTeleconsultationMedia() {
   try {
-    return await requestCameraStream()
+    return await requestAvStream()
   } catch {
-    return null
+    try {
+      return await requestCameraStream()
+    } catch {
+      return null
+    }
   }
 }
