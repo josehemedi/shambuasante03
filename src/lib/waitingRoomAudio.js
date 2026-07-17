@@ -50,19 +50,47 @@ export async function playWaitingRoomChime() {
   }
 }
 
+function formatDoctorSpokenName(name, locale = "fr") {
+  const raw = (name || "").trim()
+  if (!raw) return ""
+  if (/^(dr\.?|docteur|doctor)\b/i.test(raw)) return raw
+  return locale === "fr" ? `Docteur ${raw}` : `Doctor ${raw}`
+}
+
+function buildCallAnnouncement(payload, locale = "fr") {
+  const number =
+    payload?.numeroPassage != null ? String(payload.numeroPassage).padStart(3, "0") : ""
+  const patient = (payload?.patientNom || "").trim()
+  const room = (payload?.salle || "").trim()
+  const doctor = formatDoctorSpokenName(payload?.medecinNom, locale)
+  const isRecall = Boolean(payload?.rappel)
+
+  if (locale === "fr") {
+    const prefix = isRecall ? "Rappel." : ""
+    const ticket = number ? `Patient numéro ${number}.` : "Patient."
+    const who = patient ? ` ${patient}.` : ""
+    const destination = doctor
+      ? ` Veuillez vous présenter à la salle de consultation chez le ${doctor}.`
+      : room
+        ? ` Veuillez vous présenter à la salle de consultation ${room}.`
+        : " Veuillez vous présenter à la salle de consultation."
+    return `${prefix} ${ticket}${who}${destination}`.replace(/\s+/g, " ").trim()
+  }
+
+  const prefix = isRecall ? "Recall." : ""
+  const ticket = number ? `Patient number ${number}.` : "Patient."
+  const who = patient ? ` ${patient}.` : ""
+  const destination = doctor
+    ? ` Please proceed to the consultation room with ${doctor}.`
+    : room
+      ? ` Please proceed to consultation room ${room}.`
+      : " Please proceed to the consultation room."
+  return `${prefix} ${ticket}${who}${destination}`.replace(/\s+/g, " ").trim()
+}
+
 export function announceWaitingRoomCall(payload, locale = "fr") {
   if (typeof window === "undefined" || !window.speechSynthesis) return
-  const number = payload?.numeroPassage != null ? String(payload.numeroPassage).padStart(3, "0") : ""
-  const room = payload?.salle || ""
-  const patient = payload?.patientNom || ""
-  const text =
-    locale === "fr"
-      ? payload?.rappel
-        ? `Rappel. Patient numéro ${number}. ${patient}. Veuillez vous présenter en salle ${room}.`
-        : `Patient numéro ${number}. ${patient}. Veuillez vous présenter en salle ${room}.`
-      : payload?.rappel
-        ? `Recall. Patient number ${number}. ${patient}. Please proceed to room ${room}.`
-        : `Patient number ${number}. ${patient}. Please proceed to room ${room}.`
+  const text = buildCallAnnouncement(payload, locale)
   const utter = new SpeechSynthesisUtterance(text)
   utter.lang = locale === "fr" ? "fr-FR" : "en-US"
   utter.rate = 0.95

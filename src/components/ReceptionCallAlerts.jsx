@@ -69,12 +69,19 @@ export function ReceptionCallAlerts() {
           payload.numeroPassage != null
             ? String(payload.numeroPassage).padStart(3, "0")
             : "—"
+        const medecinRaw = (payload.medecinNom || "").trim()
+        const doctorLabel = medecinRaw
+          ? /^(dr\.?|docteur)\b/i.test(medecinRaw)
+            ? medecinRaw
+            : `Docteur ${medecinRaw}`
+          : payload.salle || "—"
         setAlert({
           key,
           rappel: Boolean(payload.rappel),
           numero,
           salle: payload.salle || "—",
           patient: payload.patientNom || "",
+          doctor: doctorLabel,
         })
         void playAndAnnounceWaitingRoomCall(payload, locale)
       },
@@ -133,6 +140,7 @@ export function ReceptionCallAlerts() {
                   number: alert.numero,
                   room: alert.salle,
                   patient: patientSuffix,
+                  doctor: alert.doctor,
                 })}
               </p>
             </div>
