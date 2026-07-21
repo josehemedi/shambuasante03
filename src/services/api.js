@@ -1742,6 +1742,11 @@ export const subscriptionService = {
       const list = await http.get("/subscriptions/timeline?limit=20")
       return (list || []).map(mapSubscriptionTimelineEvent)
     }),
+  exportInvoicesPdf: () =>
+    liveApiOnly(async () => {
+      const blob = await fetchPdfBlob("/subscriptions/invoices/export.pdf")
+      openPdfBlob(blob, "factures_abonnements_plateforme.pdf")
+    }),
 }
 
 export const monitoringService = {

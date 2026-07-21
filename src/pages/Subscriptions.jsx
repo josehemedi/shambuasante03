@@ -64,6 +64,21 @@ export default function Subscriptions() {
 
   const [query, setQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
+  const [exporting, setExporting] = useState(false)
+
+  const handleExportInvoices = async () => {
+    if (exporting) return
+    setExporting(true)
+    try {
+      await subscriptionService.exportInvoicesPdf()
+    } catch (err) {
+      if (!err?.silent) {
+        window.alert(err?.message || "Impossible d'exporter les factures.")
+      }
+    } finally {
+      setExporting(false)
+    }
+  }
 
   const filtered = useMemo(() => {
     if (!invoices) return []
@@ -92,9 +107,9 @@ export default function Subscriptions() {
                 <RefreshCw className="h-4 w-4" />
                 {t("subscriptions.refresh")}
               </Button>
-              <Button size="sm">
+              <Button size="sm" onClick={handleExportInvoices} disabled={exporting}>
                 <Download className="h-4 w-4" />
-                {t("subscriptions.exportInvoices")}
+                {exporting ? t("common.saving") : t("subscriptions.exportInvoices")}
               </Button>
             </div>
           }
