@@ -48,6 +48,7 @@ export function LegacyPathRedirect({ children }) {
       "/login",
       "/forgot-password",
       "/reset-password",
+      "/activate",
       "/waiting-room-display",
     ])
     if (publicExact.has(location.pathname)) return

@@ -25,6 +25,7 @@ import MySubscription from "@/pages/MySubscription"
 import Login from "@/pages/auth/Login"
 import ForgotPassword from "@/pages/auth/ForgotPassword"
 import ResetPassword from "@/pages/auth/ResetPassword"
+import ActivateAccount from "@/pages/auth/ActivateAccount"
 import Prescriptions from "@/pages/Prescriptions"
 import DoctorWorkspace from "@/pages/DoctorWorkspace"
 import TestRequests from "@/pages/TestRequests"
@@ -101,6 +102,7 @@ export default function App() {
       <Route path="/login" element={<Login />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPassword />} />
+      <Route path="/activate" element={<ActivateAccount />} />
 
       <Route
         path="/waiting-room-display"

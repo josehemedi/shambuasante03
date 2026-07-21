@@ -95,6 +95,10 @@ const EMPTY_FORM = {
   email: "",
   logoUrl: "",
   plan: "Starter",
+  adminPrenom: "",
+  adminNom: "",
+  adminEmail: "",
+  adminTelephone: "",
 }
 
 const inputClass =
@@ -250,6 +254,15 @@ export default function Hospitals() {
       })
       return
     }
+    const adminRequired = [form.adminPrenom, form.adminNom, form.adminEmail]
+    if (adminRequired.some((v) => !String(v || "").trim()) || !String(form.adminEmail || "").includes("@")) {
+      await Swal.fire({
+        icon: "warning",
+        title: t("hospitals.formRequiredTitle"),
+        text: t("hospitals.formAdminRequired"),
+      })
+      return
+    }
 
     setIsSubmitting(true)
     try {
@@ -259,8 +272,8 @@ export default function Hospitals() {
       await Swal.fire({
         icon: "success",
         title: t("hospitals.createSuccessTitle"),
-        text: t("hospitals.createSuccess"),
-        timer: 2200,
+        text: t("hospitals.createSuccessWithInvite"),
+        timer: 2800,
         showConfirmButton: false,
       })
     } catch (err) {
@@ -1012,6 +1025,54 @@ export default function Hospitals() {
                   </div>
                 </div>
               </div>
+
+              {modalMode === "create" && (
+                <div>
+                  <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    {t("hospitals.formSectionAdmin")}
+                  </p>
+                  <p className="mb-3 text-xs text-muted-foreground">{t("hospitals.formAdminHint")}</p>
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-foreground">{t("hospitals.formAdminPrenom")} *</label>
+                      <input
+                        value={form.adminPrenom || ""}
+                        onChange={(e) => updateForm({ adminPrenom: e.target.value })}
+                        className={inputClass}
+                        placeholder="Kwame"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-foreground">{t("hospitals.formAdminNom")} *</label>
+                      <input
+                        value={form.adminNom || ""}
+                        onChange={(e) => updateForm({ adminNom: e.target.value })}
+                        className={inputClass}
+                        placeholder="Mensah"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-foreground">{t("hospitals.formAdminEmail")} *</label>
+                      <input
+                        type="email"
+                        value={form.adminEmail || ""}
+                        onChange={(e) => updateForm({ adminEmail: e.target.value })}
+                        className={inputClass}
+                        placeholder="admin@hopital.cd"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-foreground">{t("hospitals.formAdminTelephone")}</label>
+                      <input
+                        value={form.adminTelephone || ""}
+                        onChange={(e) => updateForm({ adminTelephone: e.target.value })}
+                        className={inputClass}
+                        placeholder="+243…"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="mt-6 flex items-center justify-end gap-2">

@@ -1869,6 +1869,10 @@ function buildHospitalPayload(form) {
     email: form.email.trim(),
     logoUrl: form.logoUrl?.trim() || null,
     planNom: form.plan || "Starter",
+    adminPrenom: form.adminPrenom?.trim() || "",
+    adminNom: form.adminNom?.trim() || "",
+    adminEmail: form.adminEmail?.trim() || "",
+    adminTelephone: form.adminTelephone?.trim() || null,
   }
 }
 
@@ -1926,10 +1930,14 @@ export const hospitalService = {
       const updated = await http.put(`/hopitaux/${idHopital}/platform`, buildHospitalUpdatePayload(form))
       return mapHospitalDetail(updated)
     }),
-  setStatus: (idHopital, active) =>
+  inviteAdmin: (idHopital, payload) =>
     liveApiOnly(async () => {
-      const updated = await http.patch(`/hopitaux/${idHopital}/status`, { active })
-      return mapHospitalDetail(updated)
+      return http.post(`/hopitaux/${idHopital}/invite-admin`, {
+        adminPrenom: payload.adminPrenom?.trim(),
+        adminNom: payload.adminNom?.trim(),
+        adminEmail: payload.adminEmail?.trim(),
+        adminTelephone: payload.adminTelephone?.trim() || null,
+      })
     }),
 }
 

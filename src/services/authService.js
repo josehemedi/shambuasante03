@@ -47,3 +47,11 @@ export async function requestPasswordReset(email) {
 export async function resetPasswordRequest({ token, password }) {
   return http.post("/auth/reset-password", { token, password })
 }
+
+export async function activateAccountRequest({ token, password }) {
+  return http.post("/auth/activate", { token, password })
+}
+
+export async function resendActivationRequest(email) {
+  return http.post("/auth/resend-activation", { email })
+}
