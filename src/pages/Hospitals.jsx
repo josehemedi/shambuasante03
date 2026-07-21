@@ -27,6 +27,8 @@ import {
   X,
   Ban,
   Power,
+  UserCog,
+  ShieldCheck,
 } from "lucide-react"
 import { PageHeader } from "@/components/PageHeader"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, Badge, Button, Input, Avatar, Progress } from "@/components/ui/primitives"
@@ -965,6 +967,85 @@ export default function Hospitals() {
                 </div>
               </div>
 
+              {modalMode === "create" && (
+                <div className="rounded-2xl border-2 border-primary/25 bg-primary/[0.04] p-4 shadow-sm">
+                  <div className="mb-3 flex items-start gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground">
+                      <UserCog className="h-5 w-5" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-bold text-foreground">
+                        {t("hospitals.formSectionAdminCredentials")}
+                      </p>
+                      <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
+                        {t("hospitals.formAdminCredentialsHint")}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div className="space-y-2 sm:col-span-2">
+                      <label className="flex items-center gap-1.5 text-sm font-medium text-foreground">
+                        <Mail className="h-3.5 w-3.5 text-primary" />
+                        {t("hospitals.formAdminLogin")} *
+                      </label>
+                      <input
+                        type="email"
+                        value={form.adminEmail || ""}
+                        onChange={(e) => updateForm({ adminEmail: e.target.value })}
+                        className={inputClass}
+                        placeholder="admin@hopital.cd"
+                        autoComplete="off"
+                        required
+                      />
+                      <p className="text-[11px] text-muted-foreground">{t("hospitals.formAdminLoginHint")}</p>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-foreground">{t("hospitals.formAdminPrenom")} *</label>
+                      <input
+                        value={form.adminPrenom || ""}
+                        onChange={(e) => updateForm({ adminPrenom: e.target.value })}
+                        className={inputClass}
+                        placeholder="Kwame"
+                        autoComplete="off"
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-foreground">{t("hospitals.formAdminNom")} *</label>
+                      <input
+                        value={form.adminNom || ""}
+                        onChange={(e) => updateForm({ adminNom: e.target.value })}
+                        className={inputClass}
+                        placeholder="Mensah"
+                        autoComplete="off"
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2 sm:col-span-2">
+                      <label className="flex items-center gap-1.5 text-sm font-medium text-foreground">
+                        <Phone className="h-3.5 w-3.5 text-muted-foreground" />
+                        {t("hospitals.formAdminTelephone")}
+                      </label>
+                      <input
+                        value={form.adminTelephone || ""}
+                        onChange={(e) => updateForm({ adminTelephone: e.target.value })}
+                        className={inputClass}
+                        placeholder="+243…"
+                        autoComplete="off"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="mt-4 flex items-start gap-2 rounded-xl border border-border/80 bg-card/80 px-3 py-2.5">
+                    <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-secondary" />
+                    <p className="text-[11px] leading-relaxed text-muted-foreground">
+                      {t("hospitals.formAdminPasswordNote")}
+                    </p>
+                  </div>
+                </div>
+              )}
+
               <div>
                 <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                   {t("hospitals.formSectionLocation")}
@@ -1025,54 +1106,6 @@ export default function Hospitals() {
                   </div>
                 </div>
               </div>
-
-              {modalMode === "create" && (
-                <div>
-                  <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                    {t("hospitals.formSectionAdmin")}
-                  </p>
-                  <p className="mb-3 text-xs text-muted-foreground">{t("hospitals.formAdminHint")}</p>
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium text-foreground">{t("hospitals.formAdminPrenom")} *</label>
-                      <input
-                        value={form.adminPrenom || ""}
-                        onChange={(e) => updateForm({ adminPrenom: e.target.value })}
-                        className={inputClass}
-                        placeholder="Kwame"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium text-foreground">{t("hospitals.formAdminNom")} *</label>
-                      <input
-                        value={form.adminNom || ""}
-                        onChange={(e) => updateForm({ adminNom: e.target.value })}
-                        className={inputClass}
-                        placeholder="Mensah"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium text-foreground">{t("hospitals.formAdminEmail")} *</label>
-                      <input
-                        type="email"
-                        value={form.adminEmail || ""}
-                        onChange={(e) => updateForm({ adminEmail: e.target.value })}
-                        className={inputClass}
-                        placeholder="admin@hopital.cd"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium text-foreground">{t("hospitals.formAdminTelephone")}</label>
-                      <input
-                        value={form.adminTelephone || ""}
-                        onChange={(e) => updateForm({ adminTelephone: e.target.value })}
-                        className={inputClass}
-                        placeholder="+243…"
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
             </div>
 
             <div className="mt-6 flex items-center justify-end gap-2">
