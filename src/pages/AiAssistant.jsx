@@ -383,14 +383,22 @@ export default function AiAssistant() {
         },
       ])
       setAiOnline(true)
-    } catch {
+    } catch (err) {
       setAiOnline(false)
+      const planDenied =
+        err?.code === "PLAN_FEATURE_DENIED" ||
+        /forfait|plan|feature/i.test(String(err?.message || ""))
+      const detail = planDenied
+        ? t("ai.errorPlanDenied")
+        : err?.message && !err.silent
+          ? err.message
+          : t("ai.errorUnavailable")
       setMessages((m) => [
         ...m,
         {
           id: Date.now() + 1,
           role: "assistant",
-          text: t("ai.errorUnavailable"),
+          text: detail,
         },
       ])
     } finally {
