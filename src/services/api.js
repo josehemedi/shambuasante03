@@ -479,8 +479,11 @@ function mapReceptionStats(stats) {
 
 function mapAdmissionStatus(statut) {
   const s = String(statut || "").toUpperCase()
+  if (s === "ATTENTE_TRIAGE") return "waiting_triage"
+  if (s === "ORIENTE" || s === "ORIENTED") return "oriented"
+  if (s === "ENREGISTRE" || s === "CONFIRME" || s === "APPELE" || s === "RECU") return "received"
+  if (s === "ABSENT") return "absent"
   if (s === "EN_ATTENTE") return "waiting"
-  if (s === "ENREGISTRE" || s === "CONFIRME") return "checked-in"
   if (s === "PROGRAMME") return "scheduled"
   if (s === "EN_CONSULTATION" || s === "TERMINE") return "in-progress"
   return "waiting"
@@ -504,13 +507,24 @@ function formatRegistrationHour(hour) {
 }
 
 function mapAdmission(a) {
+  const statutRaw = a.statut || ""
+  const status =
+    a.statutAdministratif ||
+    mapAdmissionStatus(statutRaw)
   return {
     id: a.idAdmission,
+    idAdmission: a.idAdmission,
+    idPatient: a.idPatient ?? null,
+    idMedecin: a.idMedecin ?? null,
+    idRendezVous: a.idRendezVous ?? null,
     patient: a.nomCompletPatient || a.nomPatient || "Patient",
     doctor: a.nomMedecin || "—",
     appt: formatQueueTime(a.tempsArrivee),
-    status: mapAdmissionStatus(a.statut),
+    status,
+    statutRaw,
     waited: a.tempsAttenteMinutes != null ? `${a.tempsAttenteMinutes} min` : "—",
+    numeroPassage: a.numeroPassage ?? null,
+    motif: a.motifVisite || a.motifConsultation || "—",
   }
 }
 
@@ -910,6 +924,16 @@ export const patientService = {
       openPdfBlob(blob, "rapport_patients.pdf")
     }),
   create: (payload) => liveApiOnly(() => http.post("/patients", payload)),
+  update: (id, payload) => liveApiOnly(() => http.put(`/patients/${id}`, payload)),
+  search: ({ nom, prenom } = {}) =>
+    liveApiOnly(async () => {
+      const params = new URLSearchParams()
+      if (nom) params.set("nom", nom)
+      if (prenom) params.set("prenom", prenom)
+      const qs = params.toString() ? `?${params}` : ""
+      const list = await http.get(`/patients/search${qs}`)
+      return (list || []).map(mapPatient)
+    }),
 }
 
 export const dischargeService = {
@@ -1187,6 +1211,25 @@ export const appointmentService = {
       return http.get(`/rendezvous${qs}`).then((list) => (list || []).map(mapRendezVous01))
     }),
   create: (payload) => liveApiOnly(() => http.post("/rendezvous", payload)),
+  cancel: (id) => liveApiOnly(() => http.patch(`/rendezvous/${id}/annuler`)),
+  reschedule: (id, nouvelleDateIso) =>
+    liveApiOnly(() =>
+      http.patch(
+        `/rendezvous/${id}/reporter?nouvelleDate=${encodeURIComponent(nouvelleDateIso)}`,
+      ),
+    ),
+  confirm: (id) => liveApiOnly(() => http.patch(`/rendezvous/${id}/confirmer`)),
+  markAbsent: (id) => liveApiOnly(() => http.patch(`/rendezvous/${id}/absent`)),
+  resendConfirmation: (id) =>
+    liveApiOnly(() => http.post(`/rendezvous/${id}/renvoyer-confirmation`)),
+  checkAvailability: (idMedecin, dateHeureIso) =>
+    liveApiOnly(() => {
+      const params = new URLSearchParams({
+        dateHeure: dateHeureIso,
+        idMedecin: String(idMedecin),
+      })
+      return http.get(`/rendezvous/disponibilite?${params}`)
+    }),
 }
 
 export const doctorService = {
@@ -1243,6 +1286,14 @@ export const doctorService = {
     }),
   completeAppointment: (idRdv) =>
     liveApiOnly(() => http.patch(`/rendezvous/${idRdv}/terminer`)),
+  acceptAppointmentRequest: (idRdv) =>
+    liveApiOnly(() => http.patch(`/rendezvous/${idRdv}/accepter-demande`)),
+  rejectAppointmentRequest: (idRdv, motif) =>
+    liveApiOnly(() =>
+      http.patch(
+        `/rendezvous/${idRdv}/refuser-demande${motif ? `?motif=${encodeURIComponent(motif)}` : ""}`,
+      ),
+    ),
   createAppointment: (payload) => appointmentService.create(payload),
 }
 
@@ -1257,6 +1308,48 @@ export const medecinLabService = {
       const created = await http.post("/medecin/laboratoire/demandes", payload)
       return mapMedecinLabRequest(created)
     }),
+  /** Transmet le résultat labo au patient (e-mail + portail). */
+  sendResultToPatient: (idAnalyse) =>
+    liveApiOnly(() => http.post(`/medecin/partages/lab/${idAnalyse}/envoyer`, {})),
+}
+
+export const medecinShareService = {
+  sendLabResult: (idAnalyse) => medecinLabService.sendResultToPatient(idAnalyse),
+  sendConsultation: (idConsultation) =>
+    liveApiOnly(() => http.post(`/medecin/partages/consultations/${idConsultation}/envoyer`, {})),
+  sendDocument: async ({ idPatient, typeDocument, titre, file }) => {
+    const form = new FormData()
+    form.append("idPatient", String(idPatient))
+    if (typeDocument) form.append("typeDocument", typeDocument)
+    if (titre) form.append("titre", titre)
+    form.append("fichier", file)
+    const headers = new Headers()
+    const token = getToken()
+    if (token) headers.set("Authorization", `Bearer ${token}`)
+    if (shouldSendHopitalHeader()) {
+      const hopitalId = getHopitalId()
+      if (hopitalId != null) headers.set("X-Hopital-Id", String(hopitalId))
+    }
+    const response = await fetch(`${API_BASE_URL}/medecin/partages/documents`, {
+      method: "POST",
+      headers,
+      body: form,
+    })
+    const text = await response.text()
+    let payload = null
+    try {
+      payload = text ? JSON.parse(text) : null
+    } catch {
+      payload = text
+    }
+    if (!response.ok) {
+      const err = new Error(payload?.message || payload?.error || "Échec de l'envoi du document.")
+      err.status = response.status
+      err.payload = payload
+      throw err
+    }
+    return payload
+  },
 }
 
 export const labTechService = {
@@ -1496,9 +1589,10 @@ function parseDurationMinutes(value) {
 function mapDoctorRdvStatusForList(statut, dateHeure, dureeEstimee) {
   const normalized = (statut || "").toUpperCase()
   if (normalized === "VALIDE") return "completed"
-  if (normalized === "ANNULE" || normalized === "ABSENT") return "cancelled"
+  if (normalized === "ANNULE" || normalized === "ABSENT" || normalized === "REFUSE") return "cancelled"
+  if (normalized === "EN_ATTENTE") return "pending"
 
-  const start = dateHeure ? new Date(dateHeure) : null
+  const start = dateHeure ? new Date(String(dateHeure).replace(" ", "T")) : null
   if (!start || Number.isNaN(start.getTime())) return "upcoming"
 
   const durationMin = parseDurationMinutes(dureeEstimee)
@@ -1569,7 +1663,58 @@ function mapPatientAppointmentCard(rdv) {
   }
 }
 
+function mapPatientInvoice(f) {
+  return {
+    id: f.idFacture,
+    idFacture: f.idFacture,
+    numero: f.numeroFacture || `FAC-${f.idFacture}`,
+    date: f.dateFacture,
+    montantHt: f.montantTotalHt,
+    montantTtc: f.montantTotalTtc,
+    tva: f.tva,
+    statut: (f.statutPaiement || "IMPAYE").toUpperCase(),
+  }
+}
+
+function mapPatientPrescription(o) {
+  return {
+    id: o.idOrdonnance,
+    idOrdonnance: o.idOrdonnance,
+    numero: o.numeroOrdonnance || `ORD-${o.idOrdonnance}`,
+    date: o.datePrescription,
+    medecin: o.nomMedecin || "—",
+    diagnostic: o.diagnostic || "—",
+    statut: o.statut || "ACTIVE",
+    expiration: o.dateExpiration,
+    contenu: o.contenuOrdonnance,
+    observations: o.observations,
+  }
+}
+
+function sortPatientAppointments(list) {
+  return list.sort((a, b) => {
+    const da = a.dateHeureRdv ? new Date(String(a.dateHeureRdv).replace(" ", "T")).getTime() : 0
+    const db = b.dateHeureRdv ? new Date(String(b.dateHeureRdv).replace(" ", "T")).getTime() : 0
+    return db - da
+  })
+}
+
 export const patientPortalService = {
+  searchHospitals: (q) =>
+    liveApiOnly(async () => {
+      const list = await http.get(`/public/hospitals${q ? `?q=${encodeURIComponent(q)}` : ""}`)
+      return (list || []).map((h) => ({
+        idHopital: h.idHopital,
+        nom: h.nomCommercial || h.nom,
+        ville: h.ville,
+        pays: h.pays,
+        adresse: h.adresse,
+        telephone: h.telephone,
+      }))
+    }),
+  register: (payload) => liveApiOnly(() => http.post("/public/patients/register", payload)),
+  getProfile: () => liveApiOnly(() => http.get("/v1/patients/me/profile")),
+  updateProfile: (payload) => liveApiOnly(() => http.put("/v1/patients/me/profile", payload)),
   getKpis: () =>
     withLiveApi(async () => {
       const data = await http.get("/v1/patients/me/dashboard")
@@ -1583,17 +1728,46 @@ export const patientPortalService = {
     }, patientKpis),
   getAppointments: () =>
     liveApiOnly(async () => {
-      const data = await http.get("/v1/patients/me/dossier")
-      const list = (data.rendezVous || [])
-        .map(mapPatientAppointmentCard)
-        .sort((a, b) => {
-          const da = a.dateHeureRdv ? new Date(String(a.dateHeureRdv).replace(" ", "T")).getTime() : 0
-          const db = b.dateHeureRdv ? new Date(String(b.dateHeureRdv).replace(" ", "T")).getTime() : 0
-          return db - da
-        })
-      return list
+      const list = await http.get("/v1/patients/me/appointments")
+      return sortPatientAppointments((list || []).map(mapPatientAppointmentCard))
     }),
-  getPrescriptions: () => mockResolve(patientPrescriptions),
+  requestAppointment: (payload) =>
+    liveApiOnly(() => http.post("/v1/patients/me/appointments", payload)),
+  cancelAppointment: (id, motif) =>
+    liveApiOnly(() =>
+      http.post(`/v1/patients/me/appointments/${id}/cancel`, motif ? { motif } : {}),
+    ),
+  rescheduleAppointment: (id, dateHeureRdv) =>
+    liveApiOnly(() =>
+      http.post(`/v1/patients/me/appointments/${id}/reschedule`, { dateHeureRdv }),
+    ),
+  listDoctors: (specialite) =>
+    liveApiOnly(async () => {
+      const qs = specialite ? `?specialite=${encodeURIComponent(specialite)}` : ""
+      return http.get(`/v1/patients/me/doctors${qs}`)
+    }),
+  getInvoices: () =>
+    liveApiOnly(async () => {
+      const list = await http.get("/v1/patients/me/invoices")
+      return (list || []).map(mapPatientInvoice)
+    }),
+  getPrescriptions: () =>
+    withLiveApi(async () => {
+      const list = await http.get("/v1/patients/me/prescriptions")
+      return (list || []).map(mapPatientPrescription)
+    }, patientPrescriptions),
+  getLabResults: () =>
+    liveApiOnly(async () => {
+      const list = await http.get("/v1/patients/me/lab-results")
+      return list || []
+    }),
+  getDocuments: () =>
+    liveApiOnly(async () => {
+      const list = await http.get("/v1/patients/me/documents")
+      return list || []
+    }),
+  requestAssistance: (payload) =>
+    liveApiOnly(() => http.post("/v1/patients/me/assistance", payload)),
   getTimeline: () =>
     withLiveApi(async () => {
       const data = await http.get("/v1/patients/me/dashboard")
@@ -1686,6 +1860,29 @@ export const receptionService = {
         `/v1/reception/dashboard/admissions/${idAdmission}/statut?nouveauStatut=ENREGISTRE`,
       ),
     ),
+  updateAdmissionStatus: (idAdmission, nouveauStatut) =>
+    liveApiOnly(() =>
+      http.post(
+        `/v1/reception/dashboard/admissions/${idAdmission}/statut?nouveauStatut=${encodeURIComponent(nouveauStatut)}`,
+      ),
+    ),
+  orientPatient: (idAdmission) =>
+    liveApiOnly(() =>
+      http.post(`/v1/reception/dashboard/admissions/${idAdmission}/statut?nouveauStatut=ORIENTE`),
+    ),
+  markReceived: (idAdmission) =>
+    liveApiOnly(() =>
+      http.post(`/v1/reception/dashboard/admissions/${idAdmission}/statut?nouveauStatut=ENREGISTRE`),
+    ),
+  markAbsent: (idAdmission) =>
+    liveApiOnly(() =>
+      http.post(`/v1/reception/dashboard/admissions/${idAdmission}/statut?nouveauStatut=ABSENT`),
+    ),
+  downloadTicketPdf: (idAdmission) =>
+    liveApiOnly(async () => {
+      const blob = await fetchPdfBlob(`/v1/reception/dashboard/admissions/${idAdmission}/ticket.pdf`)
+      openPdfBlob(blob, `ticket_passage_${idAdmission}.pdf`)
+    }),
   listSpecialites: () =>
     liveApiOnly(() => http.get("/v1/reception/dashboard/specialites")),
   listMedecinsDisponibles: ({ specialite, service, uniquementEnHoraire } = {}) =>
@@ -1699,6 +1896,12 @@ export const receptionService = {
     }),
   registerWalkIn: (payload) =>
     liveApiOnly(() => http.post("/v1/reception/dashboard/arrivees", payload)),
+  cancelAppointment: (id) => appointmentService.cancel(id),
+  rescheduleAppointment: (id, dateIso) => appointmentService.reschedule(id, dateIso),
+  confirmAppointment: (id) => appointmentService.confirm(id),
+  resendAppointmentConfirmation: (id) => appointmentService.resendConfirmation(id),
+  checkDoctorSlot: (idMedecin, dateHeureIso) =>
+    appointmentService.checkAvailability(idMedecin, dateHeureIso),
 }
 
 function mapPretSortie(item) {

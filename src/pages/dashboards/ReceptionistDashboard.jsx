@@ -18,6 +18,8 @@ import {
   Loader2,
   ClipboardList,
   RefreshCw,
+  Printer,
+  UserMinus,
 } from "lucide-react"
 import Swal from "sweetalert2"
 import withReactContent from "sweetalert2-react-content"
@@ -67,7 +69,11 @@ const CHART_COLORS = ["#1E56A0", "#2563EB", "#3B82F6", "#60A5FA", "#6366F1", "#9
 
 const QUEUE_STATUS_VARIANT = {
   waiting: "warning",
+  waiting_triage: "warning",
+  oriented: "primary",
+  received: "success",
   "checked-in": "success",
+  absent: "destructive",
   scheduled: "secondary",
   "in-progress": "primary",
 }
@@ -357,13 +363,46 @@ export default function ReceptionistDashboard() {
         title: t("recDash.walkInSuccessTitle"),
         text: t("recDash.walkInSuccessBody", {
           patient: result?.nomPatient || `${payload.prenom} ${payload.nom}`,
-          doctor: result?.nomMedecin || "—",
+          doctor: result?.nomMedecin || result?.serviceDemande || payload.serviceDemande || "—",
         }),
         timer: 3200,
         showConfirmButton: false,
       })
+      return result
     } finally {
       setSavingWalkIn(false)
+    }
+  }
+
+  const handleQueueStatus = async (row, statut) => {
+    if (!row?.idAdmission && !row?.id) return
+    const id = row.idAdmission ?? row.id
+    setCheckingInId(id)
+    try {
+      await receptionService.updateAdmissionStatus(id, statut)
+      reloadAll()
+    } catch (err) {
+      await MySwal.fire({
+        icon: "error",
+        title: t("common.error"),
+        text: err?.message || t("recDash.checkInError"),
+      })
+    } finally {
+      setCheckingInId(null)
+    }
+  }
+
+  const handlePrintTicket = async (row) => {
+    const id = row.idAdmission ?? row.id
+    if (!id) return
+    try {
+      await receptionService.downloadTicketPdf(id)
+    } catch (err) {
+      await MySwal.fire({
+        icon: "error",
+        title: t("common.error"),
+        text: err?.message || t("recDash.printTicketError"),
+      })
     }
   }
 
@@ -623,6 +662,9 @@ export default function ReceptionistDashboard() {
                       <p className="mt-0.5 truncate text-xs text-muted-foreground">
                         <Stethoscope className="mr-1 inline h-3 w-3" />
                         {row.doctor} · {row.appt}
+                        {row.numeroPassage != null
+                          ? ` · #${String(row.numeroPassage).padStart(3, "0")}`
+                          : ""}
                       </p>
                       <div className="mt-2.5 space-y-1">
                         <div className="flex items-center justify-between text-[11px] text-muted-foreground">
@@ -637,22 +679,59 @@ export default function ReceptionistDashboard() {
                           )}
                         />
                       </div>
-                    </div>
-                    {row.status === "waiting" && (
-                      <Button
-                        size="sm"
-                        disabled={checkingInId === row.id}
-                        onClick={() => handleCheckIn(row)}
-                        className="shrink-0 gap-1.5 opacity-90 group-hover:opacity-100"
-                      >
-                        {checkingInId === row.id ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        ) : (
-                          <UserCheck className="h-3.5 w-3.5" />
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {(row.status === "waiting" ||
+                          row.status === "waiting_triage" ||
+                          row.status === "oriented") && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={checkingInId === row.id}
+                            onClick={() => handleQueueStatus(row, "ORIENTE")}
+                            className="h-7 gap-1 px-2 text-[11px]"
+                          >
+                            <Stethoscope className="h-3 w-3" />
+                            {t("recDash.orient")}
+                          </Button>
                         )}
-                        {t("recDash.checkIn")}
-                      </Button>
-                    )}
+                        {row.status !== "received" && row.status !== "absent" && (
+                          <Button
+                            size="sm"
+                            disabled={checkingInId === row.id}
+                            onClick={() => handleQueueStatus(row, "ENREGISTRE")}
+                            className="h-7 gap-1 px-2 text-[11px]"
+                          >
+                            {checkingInId === row.id ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                              <UserCheck className="h-3 w-3" />
+                            )}
+                            {t("recDash.markReceived")}
+                          </Button>
+                        )}
+                        {row.status !== "absent" && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            disabled={checkingInId === row.id}
+                            onClick={() => handleQueueStatus(row, "ABSENT")}
+                            className="h-7 gap-1 px-2 text-[11px] text-destructive"
+                          >
+                            <UserMinus className="h-3 w-3" />
+                            {t("recDash.markAbsent")}
+                          </Button>
+                        )}
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={() => handlePrintTicket(row)}
+                          className="h-7 gap-1 px-2 text-[11px]"
+                        >
+                          <Printer className="h-3 w-3" />
+                          {t("recDash.printTicket")}
+                        </Button>
+                      </div>
+                    </div>
                   </div>
                 </div>
               )

@@ -15,6 +15,7 @@ import {
   Plus,
   RefreshCw,
   Search,
+  Send,
 } from "lucide-react"
 import Swal from "sweetalert2"
 import withReactContent from "sweetalert2-react-content"
@@ -35,7 +36,7 @@ import { useI18n } from "@/i18n/I18nProvider"
 import { useAuth } from "@/auth/AuthProvider"
 import { ROLE_KEYS } from "@/config/roles"
 import { cn, formatDateTime } from "@/lib/utils"
-import { medecinLabService, labTechService } from "@/services/api"
+import { medecinLabService, labTechService, medecinShareService } from "@/services/api"
 import TestRequestDetailModal from "@/components/TestRequestDetailModal"
 import NewTestRequestModal from "@/components/NewTestRequestModal"
 import PrescriptionOrdonnanceModal from "@/components/PrescriptionOrdonnanceModal"
@@ -116,6 +117,7 @@ export default function TestRequests() {
   const [selectedRequest, setSelectedRequest] = useState(null)
   const [rxRequest, setRxRequest] = useState(null)
   const [saving, setSaving] = useState(false)
+  const [sendingLabId, setSendingLabId] = useState(null)
 
   const loadRequests = useCallback(async () => {
     setLoading(true)
@@ -245,6 +247,61 @@ export default function TestRequests() {
       return
     }
     setRxRequest(req)
+  }
+
+  const sendLabResultToPatient = async (req) => {
+    if (!req?.idAnalyse) {
+      await MySwal.fire({
+        icon: "error",
+        title: t("common.error"),
+        text: t("shareToPatient.missingLabId"),
+      })
+      return
+    }
+    if (!req.resultatTexte && req.status !== "Completed") {
+      await MySwal.fire({
+        icon: "warning",
+        title: t("shareToPatient.labNotReadyTitle"),
+        text: t("shareToPatient.labNotReadyBody"),
+      })
+      return
+    }
+    const confirm = await MySwal.fire({
+      icon: "question",
+      title: t("shareToPatient.labConfirmTitle"),
+      html: t("shareToPatient.labConfirmHtml", {
+        patient: req.patientName || "—",
+        test: req.testName || req.id,
+      }),
+      showCancelButton: true,
+      confirmButtonText: t("shareToPatient.confirmSend"),
+      cancelButtonText: t("common.cancel"),
+      confirmButtonColor: "#1e40af",
+    })
+    if (!confirm.isConfirmed) return
+
+    setSendingLabId(req.idAnalyse)
+    try {
+      const result = await medecinShareService.sendLabResult(req.idAnalyse)
+      await MySwal.fire({
+        icon: "success",
+        title: t("shareToPatient.successTitle"),
+        text: t("shareToPatient.successBody", {
+          patient: result?.nomPatient || req.patientName || "—",
+          email: result?.emailMasque || "—",
+        }),
+        timer: 3200,
+        showConfirmButton: false,
+      })
+    } catch (err) {
+      await MySwal.fire({
+        icon: "error",
+        title: t("shareToPatient.errorTitle"),
+        text: err?.message || t("shareToPatient.errorBody"),
+      })
+    } finally {
+      setSendingLabId(null)
+    }
   }
 
   return (
@@ -474,6 +531,21 @@ export default function TestRequests() {
                           >
                             <Pill className="h-3.5 w-3.5" />
                             Ordonnance
+                          </Button>
+                        )}
+                        {isDoctor && (req.resultatTexte || req.status === "Completed") && (
+                          <Button
+                            size="sm"
+                            className="gap-1.5"
+                            disabled={sendingLabId === req.idAnalyse}
+                            onClick={() => sendLabResultToPatient(req)}
+                          >
+                            {sendingLabId === req.idAnalyse ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <Send className="h-3.5 w-3.5" />
+                            )}
+                            {t("shareToPatient.sendLab")}
                           </Button>
                         )}
                         {isLabTech && req.status !== "Completed" && (

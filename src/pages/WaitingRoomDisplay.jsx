@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Volume2, Users } from "lucide-react"
+import { Volume2, Users, UserPlus } from "lucide-react"
 import { useAuth } from "@/auth/AuthProvider"
 import { useI18n } from "@/i18n/I18nProvider"
 import { ROLE_KEYS } from "@/config/roles"
@@ -15,15 +15,27 @@ import {
   disconnectMedecinQueueLiveClient,
 } from "@/services/medecinQueueLiveClient"
 import { playAndAnnounceWaitingRoomCall, unlockWaitingRoomAudio } from "@/lib/waitingRoomAudio"
+import WalkInRegistrationModal from "@/components/WalkInRegistrationModal"
 
 const QUEUE_REFRESH_TYPES = new Set([
   "NEW_ADMISSION",
   "NEW_RDV",
+  "NOUVELLE_VISITE",
   "PATIENT_EN_FILE",
   "STATUS_UPDATED",
   "PATIENT_CALLED",
   "PATIENT_RECALLED",
   "REFRESH",
+])
+
+/** File afficheur accueil : tous les patients encore en attente / orientation. */
+const DISPLAY_WAITING_STATUSES = new Set([
+  "waiting",
+  "waiting_triage",
+  "oriented",
+  "checked-in",
+  "received",
+  "scheduled",
 ])
 
 function isCallEvent(payload) {
@@ -35,16 +47,39 @@ function isCallEvent(payload) {
   )
 }
 
+function toDisplayStatut(row) {
+  const raw = String(row.statutRaw || "").toUpperCase()
+  if (
+    raw === "ATTENTE_TRIAGE" ||
+    raw === "EN_ATTENTE" ||
+    raw === "ORIENTE" ||
+    raw === "ENREGISTRE" ||
+    raw === "APPELE" ||
+    raw === "EN_CONSULTATION"
+  ) {
+    return raw
+  }
+  const status = String(row.status || "").toLowerCase()
+  if (status === "waiting_triage") return "ATTENTE_TRIAGE"
+  if (status === "oriented") return "ORIENTE"
+  if (status === "received" || status === "checked-in") return "ENREGISTRE"
+  if (status === "in-progress") return "EN_CONSULTATION"
+  return "EN_ATTENTE"
+}
+
 export default function WaitingRoomDisplay() {
   const { t, locale } = useI18n()
   const { user, roleKey } = useAuth()
   const isDoctor = roleKey === ROLE_KEYS.DOCTOR
+  const isReception = roleKey === ROLE_KEYS.RECEPTIONIST
   const [live, setLive] = useState(false)
   const [soundReady, setSoundReady] = useState(false)
   const [current, setCurrent] = useState(null)
   const [history, setHistory] = useState([])
   const [queue, setQueue] = useState([])
   const [latestArrival, setLatestArrival] = useState(null)
+  const [isVisitOpen, setIsVisitOpen] = useState(false)
+  const [savingVisit, setSavingVisit] = useState(false)
   const lastKeyRef = useRef(null)
   const debounceRef = useRef(null)
 
@@ -52,14 +87,23 @@ export default function WaitingRoomDisplay() {
     try {
       if (isDoctor) {
         const list = await doctorService.getLiveQueue()
-        setQueue(Array.isArray(list) ? list : [])
+        setQueue(
+          (Array.isArray(list) ? list : []).map((row) => ({
+            id: row.idAdmission || row.id,
+            idAdmission: row.idAdmission || row.id,
+            patient: row.patientName || row.patient || "—",
+            numeroPassage: row.numeroPassage ?? null,
+            waited: row.waited || "—",
+            statut: String(row.statut || "EN_ATTENTE").toUpperCase(),
+            room: row.salle || row.room || "—",
+          })),
+        )
         return
       }
       const list = await receptionService.getQueue()
-      const waiting = (Array.isArray(list) ? list : []).filter((row) => {
-        const status = String(row.status || "").toLowerCase()
-        return status === "waiting" || status === "checked-in"
-      })
+      const waiting = (Array.isArray(list) ? list : []).filter((row) =>
+        DISPLAY_WAITING_STATUSES.has(String(row.status || "").toLowerCase()),
+      )
       setQueue(
         waiting.map((row) => ({
           id: row.id || row.idAdmission,
@@ -67,7 +111,7 @@ export default function WaitingRoomDisplay() {
           patient: row.patient || row.patientName || "—",
           numeroPassage: row.numeroPassage ?? null,
           waited: row.waited || "—",
-          statut: row.status === "checked-in" ? "ENREGISTRE" : "EN_ATTENTE",
+          statut: toDisplayStatut(row),
           room: row.room || row.salle || "—",
         })),
       )
@@ -110,7 +154,10 @@ export default function WaitingRoomDisplay() {
       const type = typeof payload === "string" ? payload : payload?.type
       if (!type || !QUEUE_REFRESH_TYPES.has(type)) return
 
-      if (type === "PATIENT_EN_FILE" && typeof payload === "object") {
+      if (
+        (type === "PATIENT_EN_FILE" || type === "NOUVELLE_VISITE") &&
+        typeof payload === "object"
+      ) {
         if (isDoctor && payload.idMedecin != null && user?.idMedecin != null) {
           if (Number(payload.idMedecin) !== Number(user.idMedecin)) return
         }
@@ -163,7 +210,29 @@ export default function WaitingRoomDisplay() {
     setSoundReady(true)
   }
 
-  const waitingPatients = queue.filter((row) => row.statut !== "APPELE")
+  const handleVisitSave = async (payload) => {
+    setSavingVisit(true)
+    try {
+      const result = await receptionService.registerWalkIn(payload)
+      setIsVisitOpen(false)
+      scheduleQueueReload()
+      if (result?.nomPatient) {
+        setLatestArrival({
+          patientNom: result.nomPatient,
+          numeroPassage: result.numeroPassage ?? null,
+          at: Date.now(),
+        })
+      }
+      return result
+    } finally {
+      setSavingVisit(false)
+    }
+  }
+
+  const waitingPatients = queue.filter((row) => {
+    const s = String(row.statut || "").toUpperCase()
+    return s !== "APPELE" && s !== "EN_CONSULTATION" && s !== "TERMINE" && s !== "ABSENT"
+  })
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-[#071428] text-white">
@@ -186,6 +255,16 @@ export default function WaitingRoomDisplay() {
               <span className={`h-2 w-2 rounded-full ${live ? "animate-pulse bg-emerald-400" : "bg-slate-400"}`} />
               {live ? t("waitingRoom.liveOn") : t("waitingRoom.liveOff")}
             </div>
+            {isReception && (
+              <button
+                type="button"
+                onClick={() => setIsVisitOpen(true)}
+                className="inline-flex items-center gap-2 rounded-full border border-sky-300/40 bg-sky-500/20 px-3 py-1.5 text-xs font-semibold text-sky-50 hover:bg-sky-500/30"
+              >
+                <UserPlus className="h-3.5 w-3.5" />
+                {t("recDash.registerWalkIn")}
+              </button>
+            )}
             {!soundReady && (
               <button
                 type="button"
@@ -328,6 +407,15 @@ export default function WaitingRoomDisplay() {
           </footer>
         )}
       </div>
+
+      {isReception && (
+        <WalkInRegistrationModal
+          isOpen={isVisitOpen}
+          onClose={() => setIsVisitOpen(false)}
+          onSaved={handleVisitSave}
+          saving={savingVisit}
+        />
+      )}
     </div>
   )
 }

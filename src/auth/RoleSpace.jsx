@@ -46,6 +46,7 @@ export function LegacyPathRedirect({ children }) {
     // Routes publiques / hors espace rôle
     const publicExact = new Set([
       "/login",
+      "/register",
       "/forgot-password",
       "/reset-password",
       "/activate",

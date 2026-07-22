@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { motion } from "framer-motion"
 import { useRolePath } from "@/hooks/useRolePath"
 import {
@@ -35,9 +35,10 @@ import {
 } from "@/components/ui/primitives"
 import { useI18n } from "@/i18n/I18nProvider"
 import { useAuth } from "@/auth/AuthProvider"
+import { useNotifications } from "@/auth/NotificationProvider"
 import { ROLE_KEYS } from "@/config/roles"
 import { useAsync } from "@/hooks/useAsync"
-import { doctorService, patientPortalService, receptionService } from "@/services/api"
+import { doctorService, patientPortalService, receptionService, appointmentService } from "@/services/api"
 import { cn, formatDate, formatDateTime } from "@/lib/utils"
 import AppointmentDrawer from "@/components/AppointmentDrawer"
 import NewAppointmentModal from "@/components/NewAppointmentModal"
@@ -45,7 +46,7 @@ import PatientAppointmentsView from "@/components/PatientAppointmentsView"
 
 const MySwal = withReactContent(Swal)
 
-const STATUS_FILTERS = ["all", "upcoming", "in-progress", "past", "completed", "cancelled"]
+const STATUS_FILTERS = ["all", "pending", "upcoming", "in-progress", "past", "completed", "cancelled"]
 const MODE_FILTERS = ["all", "tele", "physical"]
 const CREATOR_FILTERS = ["all", "mine"]
 
@@ -55,6 +56,7 @@ const STATUS_VARIANT = {
   upcoming: "default",
   past: "warning",
   cancelled: "destructive",
+  pending: "warning",
 }
 
 function enrichAppointment(appointment, locale) {
@@ -144,7 +146,7 @@ function DateBadge({ appointment, locale }) {
   )
 }
 
-function NextSessionHero({ appointment, t, locale, onJoin }) {
+function NextSessionHero({ appointment, t, locale, onJoin, allowJoin = true }) {
   if (!appointment) return null
 
   return (
@@ -172,13 +174,13 @@ function NextSessionHero({ appointment, t, locale, onJoin }) {
             </p>
           </div>
         </div>
-        {appointment.isTele && ["upcoming", "in-progress"].includes(appointment.status) ? (
+        {allowJoin && appointment.isTele && ["upcoming", "in-progress"].includes(appointment.status) ? (
           <Button size="md" className="gap-2 shadow-lg shadow-primary/20" onClick={() => onJoin(appointment)}>
             <Video className="h-4 w-4" />
             {t("appointments.actionsJoin")}
             <ChevronRight className="h-4 w-4" />
           </Button>
-        ) : !appointment.isTele && ["upcoming", "in-progress", "arrived"].includes(appointment.status) ? (
+        ) : allowJoin && !appointment.isTele && ["upcoming", "in-progress", "arrived"].includes(appointment.status) ? (
           <Button size="md" className="gap-2 shadow-lg shadow-secondary/20" onClick={() => onJoin(appointment)}>
             <Stethoscope className="h-4 w-4" />
             Ouvrir consultation
@@ -195,11 +197,33 @@ function NextSessionHero({ appointment, t, locale, onJoin }) {
   )
 }
 
-function AppointmentCard({ appointment, t, locale, onJoin, onComplete, index }) {
+function AppointmentCard({
+  appointment,
+  t,
+  locale,
+  onJoin,
+  onComplete,
+  onCancel,
+  onReschedule,
+  onConfirm,
+  onResend,
+  onAcceptRequest,
+  onRejectRequest,
+  showReceptionActions,
+  showDoctorRequestActions,
+  index,
+}) {
   const canJoinTele =
     appointment.isTele && ["upcoming", "in-progress"].includes(appointment.status)
   const canOpenPresentiel =
     !appointment.isTele && ["upcoming", "in-progress", "arrived", "past"].includes(appointment.status)
+  const canManage =
+    showReceptionActions &&
+    !["cancelled", "completed", "pending"].includes(appointment.status) &&
+    appointment.statutRdv !== "ANNULE"
+  const isPendingRequest =
+    showDoctorRequestActions &&
+    (appointment.status === "pending" || appointment.statutRdv === "EN_ATTENTE")
 
   return (
     <motion.div
@@ -209,15 +233,21 @@ function AppointmentCard({ appointment, t, locale, onJoin, onComplete, index }) 
       className={cn(
         "group relative overflow-hidden rounded-2xl border bg-card transition-all duration-200",
         "hover:-translate-y-0.5 hover:shadow-lg hover:shadow-primary/5",
-        appointment.isTele ? "border-l-4 border-l-primary" : "border-l-4 border-l-secondary",
+        isPendingRequest
+          ? "border-l-4 border-l-amber-500"
+          : appointment.isTele
+            ? "border-l-4 border-l-primary"
+            : "border-l-4 border-l-secondary",
       )}
     >
       <div
         className={cn(
           "pointer-events-none absolute inset-0 bg-gradient-to-br opacity-60",
-          appointment.isTele
-            ? "from-primary/8 via-transparent to-transparent"
-            : "from-secondary/8 via-transparent to-transparent",
+          isPendingRequest
+            ? "from-amber-500/10 via-transparent to-transparent"
+            : appointment.isTele
+              ? "from-primary/8 via-transparent to-transparent"
+              : "from-secondary/8 via-transparent to-transparent",
         )}
       />
 
@@ -263,23 +293,63 @@ function AppointmentCard({ appointment, t, locale, onJoin, onComplete, index }) 
         </div>
 
         <div className="flex shrink-0 flex-col gap-2 sm:items-end">
-          {canJoinTele && (
+          {isPendingRequest && (
+            <>
+              <Button size="sm" className="gap-2 shadow-sm" onClick={() => onAcceptRequest?.(appointment)}>
+                <CheckCircle2 className="h-4 w-4" />
+                {t("appointments.actionsAcceptRequest")}
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-2 text-destructive"
+                onClick={() => onRejectRequest?.(appointment)}
+              >
+                <XCircle className="h-4 w-4" />
+                {t("appointments.actionsRejectRequest")}
+              </Button>
+            </>
+          )}
+          {!isPendingRequest && canJoinTele && !showReceptionActions && (
             <Button size="sm" className="gap-2 shadow-sm" onClick={() => onJoin(appointment)}>
               <Video className="h-4 w-4" />
               {t("appointments.actionsJoin")}
             </Button>
           )}
-          {canOpenPresentiel && (
+          {!isPendingRequest && canOpenPresentiel && !showReceptionActions && (
             <Button size="sm" className="gap-2 shadow-sm" onClick={() => onJoin(appointment)}>
               <Stethoscope className="h-4 w-4" />
               Ouvrir consultation
             </Button>
           )}
-          {["in-progress", "past"].includes(appointment.status) && (
+          {!isPendingRequest && ["in-progress", "past"].includes(appointment.status) && (
             <Button size="sm" variant="outline" className="gap-2" onClick={() => onComplete?.(appointment)}>
               <CheckCircle2 className="h-4 w-4" />
               {t("appointments.actionsComplete")}
             </Button>
+          )}
+          {canManage && (
+            <>
+              <Button size="sm" variant="outline" className="gap-2" onClick={() => onConfirm?.(appointment)}>
+                {t("appointments.actionsConfirm")}
+              </Button>
+              <Button size="sm" variant="outline" className="gap-2" onClick={() => onReschedule?.(appointment)}>
+                <CalendarClock className="h-4 w-4" />
+                {t("appointments.actionsReschedule")}
+              </Button>
+              <Button size="sm" variant="outline" className="gap-2" onClick={() => onResend?.(appointment)}>
+                {t("appointments.actionsResend")}
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="gap-2 text-destructive"
+                onClick={() => onCancel?.(appointment)}
+              >
+                <XCircle className="h-4 w-4" />
+                {t("appointments.actionsCancel")}
+              </Button>
+            </>
           )}
         </div>
       </div>
@@ -287,7 +357,7 @@ function AppointmentCard({ appointment, t, locale, onJoin, onComplete, index }) 
   )
 }
 
-function AppointmentsTable({ appointments, t, lang, locale, onJoin, onComplete }) {
+function AppointmentsTable({ appointments, t, lang, locale, onJoin, onComplete, allowJoin = true }) {
   return (
     <div className="overflow-x-auto">
       <table className="w-full min-w-[960px] text-left text-sm">
@@ -339,12 +409,12 @@ function AppointmentsTable({ appointments, t, lang, locale, onJoin, onComplete }
               <td className="px-5 py-3.5 text-muted-foreground">{a.duration}</td>
               <td className="px-5 py-3.5">
                 <div className="flex items-center justify-end gap-2">
-                  {a.status === "upcoming" && a.isTele && (
+                  {allowJoin && a.status === "upcoming" && a.isTele && (
                     <Button variant="outline" size="sm" onClick={() => onJoin(a)}>
                       {t("appointments.actionsJoin")}
                     </Button>
                   )}
-                  {!a.isTele && ["upcoming", "in-progress", "arrived", "past"].includes(a.status) && (
+                  {allowJoin && !a.isTele && ["upcoming", "in-progress", "arrived", "past"].includes(a.status) && (
                     <Button size="sm" onClick={() => onJoin(a)}>
                       Ouvrir consultation
                     </Button>
@@ -388,6 +458,7 @@ export default function Appointments() {
   const { t, lang, locale } = useI18n()
   const { go } = useRolePath()
   const { user, roleKey } = useAuth()
+  const { notifications } = useNotifications()
   const isPatient = roleKey === ROLE_KEYS.PATIENT
   const isDoctor = roleKey === ROLE_KEYS.DOCTOR
   const isReception = roleKey === ROLE_KEYS.RECEPTIONIST
@@ -407,6 +478,16 @@ export default function Appointments() {
         : appointmentApi.getAppointments({ mine: isReception && creatorFilter === "mine" }),
     [isPatient, isReception, creatorFilter],
   )
+
+  const lastRdvNotifId = useRef(null)
+  useEffect(() => {
+    const relevant = (notifications || []).find((n) =>
+      ["RDV_CREATED", "RDV_DEMANDE", "RDV_ACCEPTED", "RDV_REJECTED"].includes(n.type),
+    )
+    if (!relevant || relevant.id === lastRdvNotifId.current) return
+    lastRdvNotifId.current = relevant.id
+    reload()
+  }, [notifications, reload])
 
   const enriched = useMemo(
     () => (appointments || []).map((a) => enrichAppointment(a, locale)),
@@ -443,10 +524,11 @@ export default function Appointments() {
 
   const kpis = useMemo(() => {
     if (isPatient) {
-      return { total: 0, upcoming: 0, inProgress: 0, past: 0, completed: 0, cancelled: 0, tele: 0, presential: 0 }
+      return { total: 0, upcoming: 0, inProgress: 0, past: 0, completed: 0, cancelled: 0, tele: 0, presential: 0, pending: 0 }
     }
     return {
       total: enriched.length,
+      pending: enriched.filter((a) => a.status === "pending").length,
       upcoming: enriched.filter((a) => a.status === "upcoming").length,
       inProgress: enriched.filter((a) => a.status === "in-progress").length,
       past: enriched.filter((a) => a.status === "past").length,
@@ -461,7 +543,7 @@ export default function Appointments() {
     const now = Date.now()
     return enriched
       .filter((a) => {
-        if (a.status === "cancelled" || a.status === "completed" || a.status === "past") return false
+        if (a.status === "cancelled" || a.status === "completed" || a.status === "past" || a.status === "pending") return false
         const ts = a.dateHeureRdv ? new Date(String(a.dateHeureRdv).replace(" ", "T")).getTime() : 0
         return ts >= now || a.status === "in-progress"
       })
@@ -479,7 +561,7 @@ export default function Appointments() {
     (isReception && creatorFilter !== "all")
 
   const handleJoin = (appointment) => {
-    if (!appointment?.id) return
+    if (!appointment?.id || isReception) return
     if (appointment.isTele || appointment.mode === "Teleconsultation" || appointment.canal === "TELECONSULTATION") {
       go(`/teleconsultation?rdv=${appointment.id}`)
       return
@@ -515,6 +597,87 @@ export default function Appointments() {
         text: err?.message || t("appointments.completeErrorText"),
       })
     }
+  }
+
+  const runApptAction = async (appointment, action, successKey) => {
+    if (!appointment?.id) return
+    try {
+      await action(appointment.id)
+      reload()
+      await MySwal.fire({
+        icon: "success",
+        title: t(successKey),
+        timer: 2000,
+        showConfirmButton: false,
+      })
+    } catch (err) {
+      await MySwal.fire({
+        icon: "error",
+        title: t("common.error"),
+        text: err?.message || "—",
+      })
+    }
+  }
+
+  const handleCancelAppt = (appointment) =>
+    runApptAction(appointment, (id) => appointmentService.cancel(id), "appointments.cancelSuccess")
+
+  const handleConfirmAppt = (appointment) =>
+    runApptAction(appointment, (id) => appointmentService.confirm(id), "appointments.confirmSuccess")
+
+  const handleAcceptRequest = (appointment) =>
+    runApptAction(
+      appointment,
+      (id) => doctorService.acceptAppointmentRequest(id),
+      "appointments.acceptRequestSuccess",
+    )
+
+  const handleRejectRequest = async (appointment) => {
+    if (!appointment?.id) return
+    const { value: motif, isConfirmed } = await MySwal.fire({
+      title: t("appointments.actionsRejectRequest"),
+      input: "text",
+      inputLabel: t("appointments.rejectRequestPrompt"),
+      showCancelButton: true,
+      confirmButtonText: t("appointments.actionsRejectRequest"),
+      cancelButtonText: t("common.cancel"),
+      confirmButtonColor: "#b91c1c",
+    })
+    if (!isConfirmed) return
+    await runApptAction(
+      appointment,
+      (id) => doctorService.rejectAppointmentRequest(id, motif),
+      "appointments.rejectRequestSuccess",
+    )
+  }
+
+  const handleResendAppt = (appointment) =>
+    runApptAction(
+      appointment,
+      (id) => appointmentService.resendConfirmation(id),
+      "appointments.resendSuccess",
+    )
+
+  const handleRescheduleAppt = async (appointment) => {
+    if (!appointment?.id) return
+    const { value: raw } = await MySwal.fire({
+      title: t("appointments.actionsReschedule"),
+      input: "text",
+      inputLabel: t("appointments.reschedulePrompt"),
+      inputValue: appointment.dateHeureRdv
+        ? String(appointment.dateHeureRdv).slice(0, 16)
+        : "",
+      showCancelButton: true,
+      confirmButtonText: t("appointments.actionsReschedule"),
+      cancelButtonText: t("common.cancel"),
+    })
+    if (!raw) return
+    const iso = raw.includes("T") ? raw : `${raw}T09:00:00`
+    await runApptAction(
+      appointment,
+      (id) => appointmentService.reschedule(id, iso),
+      "appointments.rescheduleSuccess",
+    )
   }
 
   const clearFilters = () => {
@@ -591,12 +754,19 @@ export default function Appointments() {
         }
       />
 
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-7">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-8">
         <SummaryStat
           icon={CalendarCheck}
           label={t("appointments.total")}
           value={kpis.total}
           tone="primary"
+          loading={loading}
+        />
+        <SummaryStat
+          icon={Clock}
+          label={t("appointments.pendingRequests")}
+          value={kpis.pending}
+          tone="accent"
           loading={loading}
         />
         <SummaryStat
@@ -644,7 +814,13 @@ export default function Appointments() {
       </div>
 
       {!loading && nextSession && (
-        <NextSessionHero appointment={nextSession} t={t} locale={locale} onJoin={handleJoin} />
+        <NextSessionHero
+          appointment={nextSession}
+          t={t}
+          locale={locale}
+          onJoin={handleJoin}
+          allowJoin={!isReception}
+        />
       )}
 
       {error && (
@@ -795,6 +971,14 @@ export default function Appointments() {
                       index={i}
                       onJoin={handleJoin}
                       onComplete={handleComplete}
+                      showReceptionActions={isReception}
+                      showDoctorRequestActions={isDoctor}
+                      onCancel={handleCancelAppt}
+                      onReschedule={handleRescheduleAppt}
+                      onConfirm={handleConfirmAppt}
+                      onResend={handleResendAppt}
+                      onAcceptRequest={handleAcceptRequest}
+                      onRejectRequest={handleRejectRequest}
                     />
                   ))}
                 </div>
@@ -809,6 +993,7 @@ export default function Appointments() {
             locale={locale}
             onJoin={handleJoin}
             onComplete={handleComplete}
+            allowJoin={!isReception}
           />
         )}
       </Card>

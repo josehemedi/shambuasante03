@@ -149,6 +149,13 @@ export default function Login() {
           </Button>
         </form>
 
+        <p className="mt-5 text-center text-sm text-muted-foreground">
+          {t("auth.noAccount")}{" "}
+          <Link to="/register" className="font-medium text-primary hover:underline">
+            {t("auth.createPatientAccount")}
+          </Link>
+        </p>
+
         {/* Demo accounts helper */}
         <div className="mt-6 rounded-xl border border-border bg-muted/40 p-3">
           <button

@@ -1,11 +1,14 @@
 import { useMemo, useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
+import Swal from "sweetalert2"
 import {
   CalendarDays,
+  CalendarClock,
   ChevronRight,
   Clock,
   Loader2,
   MapPin,
+  Plus,
   RefreshCw,
   Search,
   Shield,
@@ -13,12 +16,14 @@ import {
   Video,
   Sparkles,
   Lock,
+  X,
 } from "lucide-react"
 import { Button, Badge, Avatar, Input } from "@/components/ui/primitives"
 import { useI18n } from "@/i18n/I18nProvider"
 import { useAuth } from "@/auth/AuthProvider"
 import { useRolePath } from "@/hooks/useRolePath"
 import { cn, formatDateTime } from "@/lib/utils"
+import { patientPortalService } from "@/services/api"
 import {
   formatTeleconsultationLabel,
   formatTeleconsultationNumero,
@@ -27,14 +32,15 @@ import {
 const HERO_IMAGE =
   "https://images.unsplash.com/photo-1631217868264-e5b90bb7e133?auto=format&fit=crop&w=1600&q=80"
 
-const FILTER_KEYS = ["all", "upcoming", "tele", "physical", "past"]
-
 const STATUS_STYLE = {
   upcoming: "bg-blue-800/10 text-blue-900",
   "in-progress": "bg-sky-200/70 text-blue-950",
   completed: "bg-emerald-100 text-emerald-800",
   cancelled: "bg-rose-100 text-rose-700",
+  pending: "bg-amber-100 text-amber-900",
 }
+
+const FILTER_KEYS = ["all", "pending", "upcoming", "tele", "physical", "past"]
 
 function parseApptDate(value) {
   if (!value) return null
@@ -55,12 +61,14 @@ export default function PatientAppointmentsView({ appointments, loading, error, 
   const { go } = useRolePath()
   const [query, setQuery] = useState("")
   const [filter, setFilter] = useState("all")
+  const [actionId, setActionId] = useState(null)
 
   const stats = useMemo(() => {
     const list = appointments || []
     return {
       total: list.length,
-      upcoming: list.filter((a) => a.status === "upcoming" || a.status === "in-progress").length,
+      pending: list.filter((a) => a.status === "pending").length,
+      upcoming: list.filter((a) => a.status === "upcoming" || a.status === "in-progress" || a.status === "pending").length,
       tele: list.filter((a) => a.isTele && a.status !== "completed" && a.status !== "cancelled").length,
       physical: list.filter((a) => !a.isTele && a.status !== "completed" && a.status !== "cancelled").length,
     }
@@ -79,10 +87,12 @@ export default function PatientAppointmentsView({ appointments, loading, error, 
         String(a.idRdv || "").includes(q)
       const matchesFilter =
         filter === "all" ||
-        (filter === "upcoming" && (a.status === "upcoming" || a.status === "in-progress")) ||
+        (filter === "pending" && a.status === "pending") ||
+        (filter === "upcoming" &&
+          (a.status === "upcoming" || a.status === "in-progress" || a.status === "pending")) ||
         (filter === "tele" && a.isTele) ||
         (filter === "physical" && !a.isTele) ||
-        (filter === "past" && (a.status === "completed" || a.status === "cancelled"))
+        (filter === "past" && (a.status === "completed" || a.status === "cancelled" || a.status === "past"))
       return matchesQuery && matchesFilter
     })
   }, [appointments, query, filter])
@@ -117,6 +127,82 @@ export default function PatientAppointmentsView({ appointments, loading, error, 
   function handleJoin(appointment) {
     if (appointment?.idRdv) {
       go(`/teleconsultation?rdv=${appointment.idRdv}`)
+    }
+  }
+
+  async function handleCancel(appointment) {
+    const id = appointment?.idRdv || appointment?.id
+    if (!id) return
+    const result = await Swal.fire({
+      icon: "warning",
+      title: t("patientPortal.appointment.cancelConfirmTitle"),
+      text: t("patientPortal.appointment.cancelConfirmText"),
+      input: "text",
+      inputPlaceholder: t("patientPortal.appointment.cancelReasonPlaceholder"),
+      showCancelButton: true,
+      confirmButtonText: t("patientPortal.appointment.cancelConfirm"),
+      cancelButtonText: t("common.cancel"),
+    })
+    if (!result.isConfirmed) return
+    setActionId(id)
+    try {
+      await patientPortalService.cancelAppointment(id, result.value || undefined)
+      await Swal.fire({
+        icon: "success",
+        title: t("patientPortal.appointment.cancelSuccess"),
+        timer: 1800,
+        showConfirmButton: false,
+      })
+      onRetry?.()
+    } catch (err) {
+      Swal.fire({
+        icon: "error",
+        title: t("patientPortal.appointment.cancelError"),
+        text: err?.payload?.message || err?.message,
+      })
+    } finally {
+      setActionId(null)
+    }
+  }
+
+  async function handleReschedule(appointment) {
+    const id = appointment?.idRdv || appointment?.id
+    if (!id) return
+    const result = await Swal.fire({
+      icon: "question",
+      title: t("patientPortal.appointment.rescheduleTitle"),
+      html: `<input id="swal-datetime" type="datetime-local" class="swal2-input" />`,
+      showCancelButton: true,
+      confirmButtonText: t("patientPortal.appointment.rescheduleConfirm"),
+      cancelButtonText: t("common.cancel"),
+      preConfirm: () => {
+        const value = document.getElementById("swal-datetime")?.value
+        if (!value) {
+          Swal.showValidationMessage(t("patientPortal.appointment.rescheduleRequired"))
+          return false
+        }
+        return value.replace("T", " ")
+      },
+    })
+    if (!result.isConfirmed || !result.value) return
+    setActionId(id)
+    try {
+      await patientPortalService.rescheduleAppointment(id, result.value)
+      await Swal.fire({
+        icon: "success",
+        title: t("patientPortal.appointment.rescheduleSuccess"),
+        timer: 1800,
+        showConfirmButton: false,
+      })
+      onRetry?.()
+    } catch (err) {
+      Swal.fire({
+        icon: "error",
+        title: t("patientPortal.appointment.rescheduleError"),
+        text: err?.payload?.message || err?.message,
+      })
+    } finally {
+      setActionId(null)
     }
   }
 
@@ -210,6 +296,14 @@ export default function PatientAppointmentsView({ appointments, loading, error, 
             </p>
 
             <div className="mt-8 flex flex-wrap items-center gap-3">
+              <Button
+                size="lg"
+                className="h-12 gap-2.5 rounded-xl border-0 bg-blue-800 px-6 text-[15px] font-semibold text-white shadow-xl shadow-blue-950/30 transition-transform hover:scale-[1.02] hover:bg-blue-900"
+                onClick={() => go("/request-appointment")}
+              >
+                <Plus className="h-4 w-4" />
+                {t("patientPortal.appointment.requestButton")}
+              </Button>
               {canJoinNext ? (
                 <Button
                   size="lg"
@@ -327,6 +421,9 @@ export default function PatientAppointmentsView({ appointments, loading, error, 
             t={t}
             locale={locale}
             onJoin={handleJoin}
+            onCancel={handleCancel}
+            onReschedule={handleReschedule}
+            actionId={actionId}
           />
         </motion.section>
       )}
@@ -446,6 +543,9 @@ export default function PatientAppointmentsView({ appointments, loading, error, 
                           t={t}
                           locale={locale}
                           onJoin={handleJoin}
+                          onCancel={handleCancel}
+                          onReschedule={handleReschedule}
+                          actionId={actionId}
                         />
                       ))}
                     </AnimatePresence>
@@ -487,7 +587,7 @@ function StudioMetric({ icon: Icon, value, label, delay = 0 }) {
   )
 }
 
-function NextSpotlight({ appointment, t, locale, onJoin }) {
+function NextSpotlight({ appointment, t, locale, onJoin, onCancel, onReschedule, actionId }) {
   const isTele = appointment.isTele
   const canJoin = isTele && ["upcoming", "in-progress"].includes(appointment.status)
   const dt = parseApptDate(appointment.dateHeureRdv)
@@ -575,7 +675,7 @@ function NextSpotlight({ appointment, t, locale, onJoin }) {
             </p>
           </div>
         </div>
-        {canJoin && (
+        {canJoin ? (
           <Button
             size="lg"
             className="h-11 shrink-0 gap-2 rounded-xl bg-blue-800 text-white shadow-lg shadow-blue-900/20 hover:bg-blue-900"
@@ -585,13 +685,21 @@ function NextSpotlight({ appointment, t, locale, onJoin }) {
             {t("tele.joinSession")}
             <ChevronRight className="h-4 w-4" />
           </Button>
+        ) : (
+          <AppointmentActions
+            appointment={appointment}
+            t={t}
+            onCancel={onCancel}
+            onReschedule={onReschedule}
+            actionId={actionId}
+          />
         )}
       </div>
     </div>
   )
 }
 
-function AppointmentRow({ appointment, index, t, locale, onJoin }) {
+function AppointmentRow({ appointment, index, t, locale, onJoin, onCancel, onReschedule, actionId }) {
   const isTele = appointment.isTele
   const canJoin = isTele && ["upcoming", "in-progress"].includes(appointment.status)
   const dt = parseApptDate(appointment.dateHeureRdv)
@@ -671,7 +779,11 @@ function AppointmentRow({ appointment, index, t, locale, onJoin }) {
                   STATUS_STYLE[appointment.status] || "bg-blue-800/10 text-blue-900",
                 )}
               >
-                {t(`statuses.${appointment.status}`)}
+                {appointment.status === "pending"
+                  ? t("patientPortal.appointment.pendingLabel")
+                  : appointment.statutRdv === "CONFIRME"
+                    ? t("patientPortal.appointment.acceptedLabel")
+                    : t(`statuses.${appointment.status}`)}
               </Badge>
             </div>
 
@@ -736,15 +848,65 @@ function AppointmentRow({ appointment, index, t, locale, onJoin }) {
                 <ChevronRight className="h-3.5 w-3.5 opacity-70" />
               </Button>
             ) : appointment.status === "upcoming" && !isTele ? (
-              <div className="inline-flex max-w-[11rem] items-start gap-2 text-xs leading-snug text-blue-800/55">
-                <Stethoscope className="mt-0.5 h-3.5 w-3.5 shrink-0 text-blue-700" />
-                {t("appointments.patientPortal.presentialHint")}
+              <div className="flex flex-col items-end gap-2">
+                <AppointmentActions
+                  appointment={appointment}
+                  t={t}
+                  onCancel={onCancel}
+                  onReschedule={onReschedule}
+                  actionId={actionId}
+                />
+                <div className="inline-flex max-w-[11rem] items-start gap-2 text-xs leading-snug text-blue-800/55">
+                  <Stethoscope className="mt-0.5 h-3.5 w-3.5 shrink-0 text-blue-700" />
+                  {t("appointments.patientPortal.presentialHint")}
+                </div>
               </div>
-            ) : null}
+            ) : (
+              <AppointmentActions
+                appointment={appointment}
+                t={t}
+                onCancel={onCancel}
+                onReschedule={onReschedule}
+                actionId={actionId}
+              />
+            )}
           </div>
         </div>
       </div>
     </motion.article>
+  )
+}
+
+function AppointmentActions({ appointment, t, onCancel, onReschedule, actionId }) {
+  const id = appointment?.idRdv || appointment?.id
+  const isUpcoming = ["upcoming", "in-progress"].includes(appointment.status)
+  const busy = actionId === id
+
+  if (!isUpcoming || !id) return null
+
+  return (
+    <div className="flex flex-wrap gap-2">
+      <Button
+        size="sm"
+        variant="outline"
+        className="h-9 gap-1.5 rounded-lg border-blue-900/15 text-blue-900 hover:bg-blue-50"
+        disabled={busy}
+        onClick={() => onReschedule(appointment)}
+      >
+        {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CalendarClock className="h-3.5 w-3.5" />}
+        {t("patientPortal.appointment.rescheduleButton")}
+      </Button>
+      <Button
+        size="sm"
+        variant="outline"
+        className="h-9 gap-1.5 rounded-lg border-rose-200 text-rose-700 hover:bg-rose-50"
+        disabled={busy}
+        onClick={() => onCancel(appointment)}
+      >
+        <X className="h-3.5 w-3.5" />
+        {t("patientPortal.appointment.cancelButton")}
+      </Button>
+    </div>
   )
 }
 

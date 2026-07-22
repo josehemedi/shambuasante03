@@ -20,6 +20,7 @@ import {
   UserX,
   Filter,
   FileBarChart2,
+  Pencil,
 } from "lucide-react"
 import Swal from "sweetalert2"
 import withReactContent from "sweetalert2-react-content"
@@ -170,7 +171,7 @@ function PatientCardSkeleton() {
   )
 }
 
-function PatientCard({ patient, index, lang, t, onOpen, onViewReport, reportLoading }) {
+function PatientCard({ patient, index, lang, t, onOpen, onViewReport, onEdit, reportLoading }) {
   const style = clinicalStyle(patient.statutClinique)
   const name = patientFullName(patient)
 
@@ -276,6 +277,18 @@ function PatientCard({ patient, index, lang, t, onOpen, onViewReport, reportLoad
             <Button
               size="sm"
               variant="outline"
+              className="justify-center gap-1.5"
+              onClick={(e) => {
+                e.stopPropagation()
+                onEdit?.(patient)
+              }}
+            >
+              <Pencil className="h-3.5 w-3.5" />
+              {t("patients.edit")}
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
               className="flex-1 justify-between group-hover:border-primary/40 group-hover:bg-primary/5"
               onClick={(e) => {
                 e.stopPropagation()
@@ -292,7 +305,7 @@ function PatientCard({ patient, index, lang, t, onOpen, onViewReport, reportLoad
   )
 }
 
-function PatientsTable({ patients, lang, t, onOpen, onViewReport, reportLoadingId }) {
+function PatientsTable({ patients, lang, t, onOpen, onViewReport, onEdit, reportLoadingId }) {
   return (
     <div className="overflow-x-auto">
       <table className="w-full min-w-[1100px] text-left text-sm">
@@ -372,6 +385,18 @@ function PatientsTable({ patients, lang, t, onOpen, onViewReport, reportLoadingI
                   <div className="flex items-center justify-end gap-1.5">
                     <Button
                       size="sm"
+                      variant="outline"
+                      className="h-8 gap-1.5 px-2.5 text-xs"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        onEdit?.(p)
+                      }}
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                      <span className="hidden lg:inline">{t("patients.edit")}</span>
+                    </Button>
+                    <Button
+                      size="sm"
                       variant="default"
                       className="h-8 gap-1.5 bg-primary px-2.5 text-xs hover:bg-primary/90"
                       disabled={isReportLoading}
@@ -440,6 +465,7 @@ export default function Patients() {
     [user?.idHopital, roleKey, creatorFilter, isDoctor],
   )
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [editingPatient, setEditingPatient] = useState(null)
   const [saving, setSaving] = useState(false)
   const [exporting, setExporting] = useState(false)
   const [listReportLoading, setListReportLoading] = useState(false)
@@ -531,28 +557,56 @@ export default function Patients() {
     setCreatorFilter("all")
   }
 
-  const handleSavePatient = async (form) => {
+  const openCreateModal = () => {
+    setEditingPatient(null)
+    setIsModalOpen(true)
+  }
+
+  const openEditModal = (p) => {
+    setEditingPatient(p)
+    setIsModalOpen(true)
+  }
+
+  const handleSavePatient = async (form, existing) => {
     if (user?.idHopital == null) {
       throw new Error(t("patients.noHospital"))
     }
 
+    const payload = {
+      nom: form.nom.trim(),
+      prenom: form.prenom.trim(),
+      sexe: form.sexe,
+      dateNaissance: form.dateNaissance,
+      groupeSanguin: form.groupeSanguin || null,
+      adresse: form.adresse.trim() || null,
+      telephone: form.telephone.trim() || null,
+      email: form.email.trim() || null,
+      profession: form.profession.trim() || null,
+      estActif: form.estActif,
+      idSociete: form.idSociete ? Number(form.idSociete) : null,
+      numeroMatricule: form.numeroMatricule.trim() || null,
+      contactUrgence: buildContactUrgence(form),
+    }
+
     setSaving(true)
     try {
-      const created = await patientService.create({
-        nom: form.nom.trim(),
-        prenom: form.prenom.trim(),
-        sexe: form.sexe,
-        dateNaissance: form.dateNaissance,
-        groupeSanguin: form.groupeSanguin || null,
-        adresse: form.adresse.trim() || null,
-        telephone: form.telephone.trim() || null,
-        email: form.email.trim() || null,
-        profession: form.profession.trim() || null,
-        estActif: form.estActif,
-        idSociete: form.idSociete ? Number(form.idSociete) : null,
-        numeroMatricule: form.numeroMatricule.trim() || null,
-        contactUrgence: buildContactUrgence(form),
-      })
+      if (existing) {
+        const id = existing._backendId ?? existing.idPatient
+        await patientService.update(id, { ...payload, idPatient: id, idHopital: user.idHopital })
+        setIsModalOpen(false)
+        setEditingPatient(null)
+        reload()
+        await MySwal.fire({
+          icon: "success",
+          title: t("patients.updateSuccessTitle"),
+          text: t("patients.updateSuccess"),
+          timer: 2200,
+          showConfirmButton: false,
+        })
+        return
+      }
+
+      const created = await patientService.create(payload)
 
       setIsModalOpen(false)
       reload()
@@ -713,7 +767,7 @@ export default function Patients() {
               {exporting ? t("patients.exporting") : t("common.export")}
             </Button>
             {!isDoctor && (
-              <Button size="md" onClick={() => setIsModalOpen(true)}>
+              <Button size="md" onClick={openCreateModal}>
                 <Plus className="h-4 w-4" />
                 {t("patients.addPatient")}
               </Button>
@@ -888,6 +942,7 @@ export default function Patients() {
                 t={t}
                 onOpen={() => openPatient(p)}
                 onViewReport={() => handleViewReport(p)}
+                onEdit={openEditModal}
                 reportLoading={reportLoadingId === (p._backendId ?? p.idPatient)}
               />
             ))}
@@ -899,6 +954,7 @@ export default function Patients() {
             t={t}
             onOpen={openPatient}
             onViewReport={handleViewReport}
+            onEdit={openEditModal}
             reportLoadingId={reportLoadingId}
           />
         )}
@@ -906,9 +962,14 @@ export default function Patients() {
 
       <NewPatientModal
         isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+        onClose={() => {
+          setIsModalOpen(false)
+          setEditingPatient(null)
+        }}
         onSave={handleSavePatient}
         loading={saving}
+        initialPatient={editingPatient}
+        mode={editingPatient ? "edit" : "create"}
       />
     </div>
   )

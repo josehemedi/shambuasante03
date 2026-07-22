@@ -36,16 +36,54 @@ const EMPTY_FORM = {
   emergencyRelation: "",
 }
 
-export default function NewPatientModal({ isOpen, onClose, onSave, loading = false }) {
+export default function NewPatientModal({
+  isOpen,
+  onClose,
+  onSave,
+  loading = false,
+  initialPatient = null,
+  mode = "create",
+}) {
   const { t } = useI18n()
   const [form, setForm] = useState(EMPTY_FORM)
   const [error, setError] = useState("")
+  const isEdit = mode === "edit" || Boolean(initialPatient?.id || initialPatient?.idPatient || initialPatient?.numericId)
 
   useEffect(() => {
     if (!isOpen) return
-    setForm(EMPTY_FORM)
+    if (initialPatient) {
+      let emergency = {}
+      try {
+        emergency =
+          typeof initialPatient.contactUrgence === "string"
+            ? JSON.parse(initialPatient.contactUrgence || "{}")
+            : initialPatient.contactUrgence || {}
+      } catch {
+        emergency = {}
+      }
+      setForm({
+        ...EMPTY_FORM,
+        nom: initialPatient.nom || initialPatient.lastName || "",
+        prenom: initialPatient.prenom || initialPatient.firstName || "",
+        sexe: initialPatient.sexe || initialPatient.gender || "M",
+        dateNaissance: String(initialPatient.dateNaissance || initialPatient.birthDate || "").slice(0, 10),
+        groupeSanguin: initialPatient.groupeSanguin || initialPatient.bloodType || "",
+        adresse: initialPatient.adresse || initialPatient.address || "",
+        telephone: initialPatient.telephone || initialPatient.phone || "",
+        email: initialPatient.email || "",
+        profession: initialPatient.profession || "",
+        estActif: initialPatient.estActif !== false && initialPatient.active !== false,
+        idSociete: initialPatient.idSociete != null ? String(initialPatient.idSociete) : "",
+        numeroMatricule: initialPatient.numeroMatricule || "",
+        emergencyName: emergency.nom || "",
+        emergencyPhone: emergency.telephone || "",
+        emergencyRelation: emergency.relation || "",
+      })
+    } else {
+      setForm(EMPTY_FORM)
+    }
     setError("")
-  }, [isOpen])
+  }, [isOpen, initialPatient])
 
   const updateField = (field, value) => {
     setForm((prev) => ({ ...prev, [field]: value }))
@@ -59,9 +97,9 @@ export default function NewPatientModal({ isOpen, onClose, onSave, loading = fal
 
     setError("")
     try {
-      await onSave({ ...form })
+      await onSave({ ...form }, isEdit ? initialPatient : null)
     } catch (err) {
-      setError(err?.message || t("patients.createError"))
+      setError(err?.message || (isEdit ? t("patients.updateError") : t("patients.createError")))
     }
   }
 
@@ -71,7 +109,7 @@ export default function NewPatientModal({ isOpen, onClose, onSave, loading = fal
           <CardHeader className="flex-row items-center justify-between border-b">
             <CardTitle className="flex items-center gap-2">
               <UserPlus className="h-5 w-5 text-primary" />
-              {t("patients.modalTitle")}
+              {isEdit ? t("patients.editModalTitle") : t("patients.modalTitle")}
             </CardTitle>
             <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8" disabled={loading}>
               <X className="h-4 w-4" />
@@ -282,7 +320,7 @@ export default function NewPatientModal({ isOpen, onClose, onSave, loading = fal
               {t("common.cancel")}
             </Button>
             <Button onClick={handleSave} disabled={loading}>
-              {loading ? t("common.loading") : t("patients.savePatient")}
+              {loading ? t("common.loading") : isEdit ? t("patients.saveChanges") : t("patients.savePatient")}
             </Button>
           </div>
         </Card>

@@ -26,6 +26,7 @@ import Login from "@/pages/auth/Login"
 import ForgotPassword from "@/pages/auth/ForgotPassword"
 import ResetPassword from "@/pages/auth/ResetPassword"
 import ActivateAccount from "@/pages/auth/ActivateAccount"
+import Register from "@/pages/auth/Register"
 import Prescriptions from "@/pages/Prescriptions"
 import DoctorWorkspace from "@/pages/DoctorWorkspace"
 import TestRequests from "@/pages/TestRequests"
@@ -44,6 +45,12 @@ import HospitalTariffs from "@/pages/HospitalTariffs"
 import CashierDesk from "@/pages/CashierDesk"
 import WaitingRoom from "@/pages/WaitingRoom"
 import WaitingRoomDisplay from "@/pages/WaitingRoomDisplay"
+import PatientAccount from "@/pages/PatientAccount"
+import PatientRequestAppointment from "@/pages/PatientRequestAppointment"
+import PatientBilling from "@/pages/PatientBilling"
+import PatientPrescriptions from "@/pages/PatientPrescriptions"
+import PatientLabResults from "@/pages/PatientLabResults"
+import PatientAssistance from "@/pages/PatientAssistance"
 
 function LegacyToRoleSpace() {
   const { roleKey } = useAuth()
@@ -83,6 +90,12 @@ const ROLE_CHILD_ROUTES = [
   { path: "sample-tracking", element: <Guard><SampleTracking /></Guard> },
   { path: "lab-results", element: <Guard><LabResults /></Guard> },
   { path: "appointments", element: <Guard><Appointments /></Guard> },
+  { path: "request-appointment", element: <Guard><PatientRequestAppointment /></Guard> },
+  { path: "account", element: <Guard><PatientAccount /></Guard> },
+  { path: "my-billing", element: <Guard><PatientBilling /></Guard> },
+  { path: "my-prescriptions", element: <Guard><PatientPrescriptions /></Guard> },
+  { path: "my-lab-results", element: <Guard><PatientLabResults /></Guard> },
+  { path: "assistance", element: <Guard><PatientAssistance /></Guard> },
   { path: "records", element: <Guard><Records /></Guard> },
   { path: "records/:patientId/cloture", element: <Guard><PatientDossierCloture /></Guard> },
   { path: "archives", element: <Guard><ArchivesDashboard /></Guard> },
@@ -103,6 +116,7 @@ export default function App() {
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/activate" element={<ActivateAccount />} />
+      <Route path="/register" element={<Register />} />
 
       <Route
         path="/waiting-room-display"

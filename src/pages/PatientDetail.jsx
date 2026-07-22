@@ -29,6 +29,7 @@ import { useAsync } from "@/hooks/useAsync"
 import { patientService } from "@/services/api"
 import { formatDate } from "@/lib/utils"
 import DischargeAuthorizationModal from "@/components/DischargeAuthorizationModal"
+import ShareDocumentToPatientPanel from "@/components/ShareDocumentToPatientPanel"
 
 const MySwal = withReactContent(Swal)
 
@@ -165,6 +166,15 @@ export default function PatientDetail() {
           </motion.div>
         ))}
       </div>
+
+      {isDoctor && (
+        <div className="mb-4">
+          <ShareDocumentToPatientPanel
+            idPatient={patient._backendId || id}
+            patientName={patient.name}
+          />
+        </div>
+      )}
 
       <div className="mb-4 flex gap-1 overflow-x-auto rounded-xl border border-border bg-card p-1">
         {tabs.map((tb) => (

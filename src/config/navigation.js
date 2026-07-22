@@ -26,6 +26,7 @@ import {
   Monitor,
   Calculator,
   Database,
+  MessageSquare,
 } from "lucide-react"
 import { ROLE_KEYS } from "@/config/roles"
 import {
@@ -70,6 +71,16 @@ export const navSections = [
     ],
   },
   {
+    group: "patientPortal",
+    items: [
+      { key: "account", path: "/account", icon: UserCog, labelKey: "nav.myAccount", roles: [ROLE_KEYS.PATIENT] },
+      { key: "myBilling", path: "/my-billing", icon: Receipt, labelKey: "nav.myBilling", roles: [ROLE_KEYS.PATIENT] },
+      { key: "myPrescriptions", path: "/my-prescriptions", icon: Pill, labelKey: "nav.myPrescriptions", roles: [ROLE_KEYS.PATIENT] },
+      { key: "myLabResults", path: "/my-lab-results", icon: FlaskConical, labelKey: "nav.myLabResults", roles: [ROLE_KEYS.PATIENT] },
+      { key: "assistance", path: "/assistance", icon: MessageSquare, labelKey: "nav.assistance", roles: [ROLE_KEYS.PATIENT] },
+    ],
+  },
+  {
     group: "laboratory",
     items: [
       { key: "testRequests", path: "/test-requests", icon: TestTube, labelKey: "nav.testRequests", roles: [ROLE_KEYS.LAB_TECH, ROLE_KEYS.DOCTOR], planFeature: "LAB" },
@@ -98,7 +109,7 @@ export const navSections = [
   {
     group: "management",
     items: [
-      { key: "archives", path: "/archives", icon: Archive, labelKey: "nav.archives", roles: [ROLE_KEYS.ARCHIVIST, ROLE_KEYS.HOSPITAL_ADMIN, ROLE_KEYS.DOCTOR, ROLE_KEYS.RECEPTIONIST] },
+      { key: "archives", path: "/archives", icon: Archive, labelKey: "nav.archives", roles: [ROLE_KEYS.ARCHIVIST, ROLE_KEYS.HOSPITAL_ADMIN, ROLE_KEYS.DOCTOR] },
       { key: "staff", path: "/staff", icon: UserCog, labelKey: "nav.staff", roles: [ROLE_KEYS.HOSPITAL_ADMIN] },
       { key: "users", path: "/users", icon: Users, labelKey: "nav.users", roles: [ROLE_KEYS.SUPER_ADMIN, ROLE_KEYS.HOSPITAL_ADMIN] },
       { key: "reports", path: "/reports", icon: FileBarChart, labelKey: "nav.reports", roles: [ROLE_KEYS.HOSPITAL_ADMIN, ROLE_KEYS.LAB_TECH], planFeature: "REPORTS" },
