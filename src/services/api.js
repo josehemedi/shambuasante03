@@ -618,7 +618,6 @@ function mapHospitalAdminDashboard(data, lang = "fr") {
       totalPatients: kpi(kpis.totalPatients, kpis.deltaTotalPatients),
       activeConsultations: kpi(kpis.activeConsultations, kpis.deltaActiveConsultations),
       revenueMtd: kpi(kpis.revenueMtd, kpis.deltaRevenueMtd),
-      occupancy: kpi(kpis.occupancy, kpis.deltaOccupancy),
     },
     revenueSeries: (data.revenueSeries || []).map((p) => ({
       month: formatMonthLabel(p.month, p.year, lang),
@@ -634,7 +633,12 @@ function mapHospitalAdminDashboard(data, lang = "fr") {
     })),
     departmentLoad: data.departmentLoad || [],
     emergencyAlerts: data.emergencyAlerts || [],
-    aiInsights: data.aiInsights || [],
+    aiInsights: (data.aiInsights || []).filter(
+      (ins) =>
+        !/occupanc|occupation|lits/i.test(
+          `${ins.title || ""} ${ins.titleFr || ""} ${ins.message || ""} ${ins.messageFr || ""}`,
+        ),
+    ),
     activityTimeline: data.activityTimeline || [],
   }
 }
