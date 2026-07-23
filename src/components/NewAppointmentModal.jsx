@@ -118,9 +118,11 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, loading =
   useEffect(() => {
     if (isTeleconsultation) {
       setStatus("CONFIRME")
+      setInscrireFileAttente(false)
     } else {
       setStatus("PROGRAMME")
       setPatientAccepted(false)
+      setInscrireFileAttente(true)
     }
   }, [isTeleconsultation])
 
@@ -169,7 +171,7 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, loading =
         statutRdv: isTeleconsultation ? "CONFIRME" : status,
         motif: t(selectedType.labelKey),
         motifVisite: isReception ? motifVisite.trim() : undefined,
-        inscrireFileAttente: isReception ? inscrireFileAttente : undefined,
+        inscrireFileAttente: isReception ? (isTeleconsultation ? false : inscrireFileAttente) : undefined,
         notes: notes.trim(),
         patientEmail: selectedPatient?.email || null,
       })

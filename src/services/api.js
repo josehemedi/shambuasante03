@@ -2358,31 +2358,33 @@ export const teleService = {
     liveApiOnly(async () => {
       if (role === "patient") {
         try {
-          const data = await http.get("/v1/patients/me/dashboard")
-          return (data.upcomingAppointments || [])
-            .filter((a) => (a.canal || "").toUpperCase() === "TELECONSULTATION")
-            .map(mapPatientTeleSession)
+          const list = await http.get("/v1/patients/me/appointments")
+          return (list || [])
+            .filter((rdv) => (rdv.canal || "").toUpperCase() === "TELECONSULTATION")
+            .filter((rdv) => !["ANNULE", "ABSENT", "TERMINE", "TERMINÉ", "REFUSE"].includes((rdv.statutRdv || "").toUpperCase()))
+            .map((rdv) => mapPatientTeleSession({
+              ...rdv,
+              idRdv: rdv.idRdv ?? rdv.id,
+              motifVisite: rdv.motifVisite || rdv.motif,
+            }))
         } catch (err) {
-          // Repli : RDV téléconsultation du patient connecté
-          const list = await http.get("/v1/patients/me/dashboard/teleconsultations")
-          return (list || []).map(mapPatientTeleSession)
+          try {
+            const data = await http.get("/v1/patients/me/dashboard")
+            return (data.upcomingAppointments || [])
+              .filter((a) => (a.canal || "").toUpperCase() === "TELECONSULTATION")
+              .map(mapPatientTeleSession)
+          } catch {
+            const list = await http.get("/v1/patients/me/dashboard/teleconsultations")
+            return (list || []).map(mapPatientTeleSession)
+          }
         }
       }
 
-      // Médecin : RDV téléconsultation de CE médecin ∩ patients qui lui sont attribués
-      const [rdvs, assignedPatients] = await Promise.all([
-        http.get("/rendezvous/medecin/historique"),
-        http.get("/medecins/patients?mine=true"),
-      ])
-      const assignedIds = new Set(
-        (assignedPatients || [])
-          .map((p) => Number(p.idPatient ?? p._backendId ?? p.id))
-          .filter((id) => Number.isFinite(id)),
-      )
+      // Médecin : tous les RDV téléconsultation de CE médecin (y compris créés par la réception)
+      const rdvs = await http.get("/rendezvous/medecin/historique")
       return (rdvs || [])
         .filter((rdv) => (rdv.canal || "").toUpperCase() === "TELECONSULTATION")
-        .filter((rdv) => !["ANNULE", "ABSENT", "TERMINE", "TERMINÉ"].includes((rdv.statutRdv || "").toUpperCase()))
-        .filter((rdv) => assignedIds.has(Number(rdv.idPatient)))
+        .filter((rdv) => !["ANNULE", "ABSENT", "TERMINE", "TERMINÉ", "REFUSE"].includes((rdv.statutRdv || "").toUpperCase()))
         .map(mapTeleSession)
     }),
   getRendezVous: (idRendezVous) =>

@@ -19,7 +19,6 @@ import {
   Users,
   Video,
   DollarSign,
-  BedDouble,
   Sparkles,
   AlertTriangle,
   Activity,
@@ -107,7 +106,6 @@ export default function Dashboard() {
           totalPatients: t("dashboard.totalPatients"),
           activeConsultations: t("dashboard.activeConsultations"),
           revenue: t("dashboard.revenue"),
-          occupancy: t("dashboard.occupancy"),
           revenueSubtitle: t("dashboard.revenueOverview"),
           revenueNote: t("dashboard.exportRevenueNote"),
           month: t("dashboard.exportMonth"),
@@ -209,7 +207,7 @@ export default function Dashboard() {
       />
 
       {/* KPI cards */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
         <StatCard
           index={0}
           label={t("dashboard.totalPatients")}
@@ -234,16 +232,6 @@ export default function Dashboard() {
           icon={DollarSign}
           tone="secondary"
           formatter={(v) => formatCurrency(v, lang)}
-        />
-        <StatCard
-          index={3}
-          label={t("dashboard.occupancy")}
-          value={kpis?.occupancy.value ?? 0}
-          delta={kpis?.occupancy.delta ?? 0}
-          icon={BedDouble}
-          tone="warning"
-          decimals={1}
-          suffix="%"
         />
       </div>
 

@@ -234,7 +234,6 @@ function buildSummarySheet(dashboard, labels, options) {
     { key: "totalPatients", label: labels.totalPatients, color: COLORS.kpiPrimary, bg: COLORS.chart1Bg },
     { key: "activeConsultations", label: labels.activeConsultations, color: COLORS.kpiAccent, bg: COLORS.chart2Bg },
     { key: "revenueMtd", label: labels.revenue, color: COLORS.kpiSecondary, bg: COLORS.chart3Bg, format: "currency" },
-    { key: "occupancy", label: labels.occupancy, color: COLORS.kpiWarning, bg: COLORS.warningBg, suffix: "%" },
   ]
 
   let row = 4
